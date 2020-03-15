@@ -33,7 +33,7 @@ lint:
 	tox -e lint
 
 test:
-	tox --skip-missing-interpreters
+	python -m unittest tests/test_*.py
 
 coverage:
 	tox -e coverage
