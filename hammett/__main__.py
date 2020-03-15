@@ -53,7 +53,7 @@ def main():
             continue
 
         import importlib.util
-        spec = importlib.util.spec_from_file_location(f'tests.{test_filename.replace(".py", "")}', f'tests/{test_filename}')
+        spec = importlib.util.spec_from_file_location(f'{test_filename.replace(".py", "")}', f'tests/{test_filename}')
         foo = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(foo)
 
