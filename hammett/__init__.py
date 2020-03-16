@@ -281,7 +281,7 @@ def main(verbose=False, fail_fast=False, filenames=None):
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
 
-    global _fail_fast
+    global _fail_fast, _verbose
 
     _verbose = verbose
     _fail_fast = fail_fast
@@ -289,7 +289,7 @@ def main(verbose=False, fail_fast=False, filenames=None):
     if filenames is None:
         from os import listdir
         try:
-            filenames = ['tests/' + x for x in listdir('tests')]
+            filenames = ['tests/' + x for x in sorted(listdir('tests'))]
         except FileNotFoundError:
             print('No tests found')
             return 1
