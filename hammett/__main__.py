@@ -1,5 +1,7 @@
+import colorama
+
 verbose = False
-success = True
+results = dict(success=0, failed=0, skipped=0)
 
 
 def run_test(name, f, **kwargs):
@@ -8,20 +10,21 @@ def run_test(name, f, **kwargs):
     try:
         f(**kwargs)
         if verbose:
-            print('... Success')
+            print(f'... {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
         else:
-            print('.', end='')
-        return True
+            print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='')
+        results['success'] += 1
+
     except:
         global success
         success = False
         if verbose:
-            print('... Fail')
+            print(f'... {colorama.Fore.RED}Fail{colorama.Style.RESET_ALL}')
             import traceback
             traceback.print_exc()
         else:
-            print('F', end='')
-        return False
+            print(f'{colorama.Fore.RED}F{colorama.Style.RESET_ALL}', end='')
+        results['failed'] += 1
 
 
 def execute_parametrize(name, f, stack, **kwargs):
@@ -48,7 +51,13 @@ def execute_test_function(name, f):
 
 def main():
     from os import listdir
-    for test_filename in listdir('tests'):
+    try:
+        filenames = listdir('tests')
+    except FileNotFoundError:
+        print('No tests found')
+        exit(1)
+
+    for test_filename in filenames:
         if not test_filename.startswith('test_') or not test_filename.endswith('.py'):
             continue
 
@@ -63,7 +72,8 @@ def main():
 
     if not verbose:
         print()
-    exit(0 if success else 1)
+    print(f'{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped')
+    exit(1 if results['failed'] else 0)
 
 
 if __name__ == '__main__':
