@@ -1,4 +1,4 @@
-from dataclasses import MISSING
+from hammett import MISSING
 
 
 class RaisesContext(object):
@@ -30,6 +30,14 @@ auto_use_fixtures = set()
 fixture_scope = {}
 
 
+def fixture_function_name(f):
+    r = f.__name__
+    if r == '<lambda>':
+        import inspect
+        r = inspect.getsource(f)
+    return r
+
+
 # TODO: store args
 def register_fixture(fixture, *args, autouse=False, scope='function'):
     if scope == 'class':
@@ -37,7 +45,7 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
         return
     assert scope != 'package', 'Package scope is not supported at this time'
 
-    name = fixture.__name__
+    name = fixture_function_name(fixture)
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
     if autouse:
@@ -81,7 +89,7 @@ def _teardown_yield_fixture(fixturefunc, it):
 
 
 def call_fixture_func(fixturefunc, request, kwargs):
-    existing_result = request.hammett_get_existing_result(fixturefunc.__name__)
+    existing_result = request.hammett_get_existing_result(fixture_function_name(fixturefunc))
     if existing_result is not MISSING:
         return existing_result
 
@@ -89,7 +97,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
     import functools
 
     from hammett import Request
-    Request.current_fixture_setup = fixturefunc.__name__
+    Request.current_fixture_setup = fixture_function_name(fixturefunc)
 
     res = fixturefunc(**kwargs)
 
@@ -107,7 +115,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
     return res
 
 
-def dependency_injection(f, fixtures, orig_kwargs, request=None):
+def dependency_injection(f, fixtures, orig_kwargs, request):
     f_params = params_of(f)
     params_by_name = {
         name: params_of(fixture)

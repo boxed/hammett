@@ -1,10 +1,11 @@
 import sys
-from dataclasses import MISSING
 
 import hammett.mark as mark
 
 
 __version__ = '0.1.0'
+
+MISSING = object()
 
 _orig_stdout = sys.stdout
 _orig_stderr = sys.stderr
@@ -78,7 +79,7 @@ class Request:
 
     def hammett_add_fixture_result(self, result):
         from hammett.impl import fixture_scope
-        if fixture_scope[self.current_fixture_setup] != self.scope:
+        if fixture_scope.get(self.current_fixture_setup, 'function') != self.scope:
             self.parent.hammett_add_fixture_result(result)
         else:
             self.fixture_results[self.current_fixture_setup] = result
@@ -102,7 +103,7 @@ class Request:
     def addfinalizer(self, x):
         assert Request.current_fixture_setup is not None
         from hammett.impl import fixture_scope
-        if fixture_scope[Request.current_fixture_setup] != self.scope:
+        if fixture_scope.get(Request.current_fixture_setup, 'function') != self.scope:
             self.parent.addfinalizer(x)
         else:
             self.finalizers.append(x)

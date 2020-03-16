@@ -1,6 +1,9 @@
 import unittest
 
-from hammett import fixture
+from hammett import (
+    fixture,
+    Request,
+)
 from hammett.impl import (
     fixtures,
     dependency_injection,
@@ -37,4 +40,6 @@ class FixtureDecoratorTests(unittest.TestCase):
         def foo():
             return 3
 
-        assert dependency_injection(lambda: 7, fixtures, {}) == 7
+        request = Request(scope='function', parent=None)
+
+        assert dependency_injection(lambda: 7, fixtures, {}, request=request) == 7
