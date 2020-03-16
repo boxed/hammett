@@ -9,7 +9,11 @@ It does not support class based tests at this time though.
 Usage
 ------
 
-First :code:`pip install hammett`, then in your tests change :code:`import pytest` to :code:`import hammett as pytest`. Hopefully your tests now run!
+First install: :code:`pip install hammett`
+
+Then run hammett: :code:`python -m hammett`
+
+Hopefully it will run your entire test suite!
 
 hammett works with some pytest plugins, most notably pytest-django, at least for some projects.
 
