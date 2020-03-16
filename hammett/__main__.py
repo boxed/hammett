@@ -1,4 +1,8 @@
 from dataclasses import MISSING
+import sys
+
+_orig_stdout = sys.stdout
+_orig_stderr = sys.stderr
 
 _verbose = False
 results = dict(success=0, failed=0, skipped=0)
@@ -97,6 +101,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         return
 
     import colorama
+    from io import StringIO
     from hammett.impl import register_fixture
 
     req = Request(scope='function', parent=_module_request, function=_f)
@@ -107,6 +112,9 @@ def run_test(_name, _f, _module_request, **kwargs):
     register_fixture(request, autouse=True)
     del request
 
+    hijacked_stdout = StringIO()
+    hijacked_stderr = StringIO()
+
     if _verbose:
         print(_name, end='')
     try:
@@ -114,14 +122,25 @@ def run_test(_name, _f, _module_request, **kwargs):
             dependency_injection,
             fixtures,
         )
+
+        sys.stdout = hijacked_stdout
+        sys.stderr = hijacked_stderr
+
         dependency_injection(_f, fixtures, kwargs, request=req)
+
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+
         if _verbose:
             print(f'... {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
         else:
-            print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='')
+            print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
         results['success'] += 1
 
     except:
+        sys.stdout = _orig_stdout
+        sys.stderr = _orig_stderr
+
         global success
         success = False
         print(colorama.Fore.RED)
@@ -130,6 +149,18 @@ def run_test(_name, _f, _module_request, **kwargs):
         print('Failed:', _name)
         import traceback
         traceback.print_exc()
+
+        print()
+        if hijacked_stdout.getvalue():
+            print(colorama.Fore.YELLOW)
+            print('--- stdout ---')
+            print(hijacked_stdout.getvalue())
+
+        if hijacked_stderr.getvalue():
+            print(colorama.Fore.RED)
+            print('--- stderr ---')
+            print(hijacked_stderr.getvalue())
+
         print(colorama.Style.RESET_ALL)
         results['failed'] += 1
 
@@ -202,6 +233,7 @@ def read_settings():
 
 def main(verbose=False, fail_fast=False, filenames=None):
     global _verbose, _fail_fast
+
     _verbose = verbose
     _fail_fast = fail_fast
 
