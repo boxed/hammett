@@ -1,60 +1,90 @@
-verbose = False
+from dataclasses import MISSING
+
+_verbose = False
 results = dict(success=0, failed=0, skipped=0)
 settings = {}
-fail_fast = False
+_fail_fast = False
 
 
-def run_test(_name, _f, **kwargs):
+class Request:
+    current_fixture_setup = None
+
+    def __init__(self, scope, parent, function=None):
+        self.scope = scope
+        self.function = function
+        self.parent = parent
+        self.additional_fixtures_wanted = set()
+        self.keywords = {}
+        self.fixturenames = set()
+        self.finalizers = []
+        self.fixture_results = {}
+
+        class Option:
+            def __init__(self):
+                self.verbose = _verbose
+
+        class Config:
+            def __init__(self):
+                self.option = Option()
+
+            def getvalue(self, _):
+                return None
+
+        self.config = Config()
+
+    def hammett_add_fixture_result(self, result):
+        from hammett.impl import fixture_scope
+        if fixture_scope[self.current_fixture_setup] != self.scope:
+            self.parent.hammett_add_fixture_result(result)
+        else:
+            self.fixture_results[self.current_fixture_setup] = result
+
+    def hammett_get_existing_result(self, name):
+        try:
+            return self.fixture_results[name]
+        except KeyError:
+            if self.parent:
+                return self.parent.hammett_get_existing_result(name)
+            return MISSING
+
+    def teardown(self):
+        for x in reversed(self.finalizers):
+            x()
+
+    @property
+    def node(self):
+        return self
+
+    def addfinalizer(self, x):
+        assert Request.current_fixture_setup is not None
+        from hammett.impl import fixture_scope
+        if fixture_scope[Request.current_fixture_setup] != self.scope:
+            self.parent.addfinalizer(x)
+        else:
+            self.finalizers.append(x)
+
+    def get_closest_marker(self, s):
+        # TODO: fall back to the parent markers
+        try:
+            markers = self.function.hammett_markers
+        except AttributeError:
+            return None
+
+        for marker in markers:
+            if marker.name == s:
+                return marker
+
+        return None
+
+    def getfixturevalue(self, s):
+        return self.additional_fixtures_wanted.add(s)
+
+
+def run_test(_name, _f, _module_request, **kwargs):
     import colorama
     from hammett.impl import register_fixture
 
-    class Request:
-        def __init__(self):
-            self.additional_fixtures_wanted = set()
-            self.keywords = {}
-            self.fixturenames = set()
-            self.finalizers = []
-
-            class Option:
-                def __init__(self):
-                    self.verbose = verbose
-
-            class Config:
-                def __init__(self):
-                    self.option = Option()
-
-                def getvalue(self, _):
-                    return None
-
-            self.config = Config()
-
-        def teardown(self):
-            for x in reversed(self.finalizers):
-                x()
-
-        @property
-        def node(self):
-            return self
-
-        def addfinalizer(self, x):
-            self.finalizers.append(x)
-
-        def get_closest_marker(self, s):
-            try:
-                markers = _f.hammett_markers
-            except AttributeError:
-                return None
-
-            for marker in markers:
-                if marker.name == s:
-                    return marker
-
-            return None
-
-        def getfixturevalue(self, s):
-            return self.additional_fixtures_wanted.add(s)
-
-    req = Request()
+    req = Request(scope='function', parent=_module_request, function=_f)
 
     def request():
         return req
@@ -62,7 +92,7 @@ def run_test(_name, _f, **kwargs):
     register_fixture(request, autouse=True)
     del request
 
-    if verbose:
+    if _verbose:
         print(_name, end='')
     try:
         from hammett.impl import (
@@ -70,7 +100,7 @@ def run_test(_name, _f, **kwargs):
             fixtures,
         )
         dependency_injection(_f, fixtures, kwargs, request=req)
-        if verbose:
+        if _verbose:
             print(f'... {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
         else:
             print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='')
@@ -79,40 +109,41 @@ def run_test(_name, _f, **kwargs):
     except:
         global success
         success = False
-        if verbose:
-            print(f'... {colorama.Fore.RED}Fail{colorama.Style.RESET_ALL}')
+        print(colorama.Fore.RED)
+        if _verbose:
+            print('... Fail')
         else:
-            print(f'{colorama.Fore.RED}F{colorama.Style.RESET_ALL}')
+            print('F')
+
         import traceback
         traceback.print_exc()
+        print(colorama.Style.RESET_ALL)
         results['failed'] += 1
-        if fail_fast:
-            req.teardown()
-            exit(1)
 
     req.teardown()
 
 
-def execute_parametrize(_name, _f, _stack, **kwargs):
+def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
     if not _stack:
         param_names = [f'{k}={v}' for k, v in kwargs.items()]
         _name = f'{_name}[{", ".join(param_names)}]'
-        run_test(_name, _f, **kwargs)
-        return
+        return run_test(_name, _f, _module_request=_module_request, **kwargs)
 
     names, param_list = _stack[0]
     names = [x.strip() for x in names.split(',')]
     for params in param_list:
         if not isinstance(params, (list, tuple)):
             params = [params]
-        execute_parametrize(_name, _f, _stack[1:], **{**dict(zip(names, params)), **kwargs})
+        execute_parametrize(_name, _f, _stack[1:], _module_request, **{**dict(zip(names, params)), **kwargs})
+        if _fail_fast and results['failed']:
+            break
 
 
-def execute_test_function(_name, _f):
+def execute_test_function(_name, _f, module_request):
     if getattr(_f, 'hammett_parametrize_stack', None):
-        execute_parametrize(_name, _f, _f.hammett_parametrize_stack)
+        return execute_parametrize(_name, _f, _f.hammett_parametrize_stack, module_request)
     else:
-        run_test(_name, _f)
+        return run_test(_name, _f, module_request)
 
 
 def read_settings():
@@ -156,21 +187,12 @@ def read_settings():
         importlib.import_module(x + '.fixtures')
 
 
-def main():
-    global verbose, fail_fast
-    from argparse import ArgumentParser
-    parser = ArgumentParser(prog='hammett')
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
-    parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
-    parser.add_argument(dest='filenames', nargs='+')
-    args = parser.parse_args()
+def main(verbose=False, fail_fast=False, filenames=None):
+    global _verbose, _fail_fast
+    _verbose = verbose
+    _fail_fast = fail_fast
 
-    verbose = args.verbose
-    fail_fast = args.fail_fast
-
-    if args.filenames:
-        filenames = args.filenames
-    else:
+    if filenames is None:
         from os import listdir
         try:
             filenames = ['tests/' + x for x in listdir('tests')]
@@ -180,6 +202,8 @@ def main():
 
     read_settings()
     from os.path import split, sep
+
+    session_request = Request(scope='session', parent=None)
 
     for test_filename in filenames:
         dirname, filename = split(test_filename)
@@ -194,17 +218,35 @@ def main():
         sys.modules[module_name] = module
         spec.loader.exec_module(module)
 
+        module_request = Request(scope='module', parent=session_request)
+
         for name, f in module.__dict__.items():
             if name.startswith('test_'):
-                execute_test_function(module_name + '.' + name, f)
+                execute_test_function(module_name + '.' + name, f, module_request)
+            if _fail_fast and results['failed']:
+                break
+
+        module_request.teardown()
 
         del sys.modules[module_name]
 
-    if not verbose:
+        if _fail_fast and results['failed']:
+            break
+
+    session_request.teardown()
+
+    if not _verbose:
         print()
     print(f'{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped')
     return 1 if results['failed'] else 0
 
 
 if __name__ == '__main__':
-    exit(main())
+    from argparse import ArgumentParser
+    parser = ArgumentParser(prog='hammett')
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
+    parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
+    parser.add_argument(dest='filenames', nargs='+')
+    args = parser.parse_args()
+
+    exit(main(verbose=args.verbose, fail_fast=args.fail_fast, filenames=args.filenames))

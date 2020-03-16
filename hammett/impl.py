@@ -1,3 +1,6 @@
+from dataclasses import MISSING
+
+
 class RaisesContext(object):
     def __init__(self, expected_exception):
         self.expected_exception = expected_exception
@@ -32,6 +35,7 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     if scope == 'class':
         # hammett does not support class based tests
         return
+    assert scope != 'package', 'Package scope is not supported at this time'
 
     name = fixture.__name__
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
@@ -77,10 +81,19 @@ def _teardown_yield_fixture(fixturefunc, it):
 
 
 def call_fixture_func(fixturefunc, request, kwargs):
+    existing_result = request.hammett_get_existing_result(fixturefunc.__name__)
+    if existing_result is not MISSING:
+        return existing_result
+
     import inspect
     import functools
 
+    from hammett.__main__ import Request
+    Request.current_fixture_setup = fixturefunc.__name__
+
     res = fixturefunc(**kwargs)
+
+    request.hammett_add_fixture_result(res)
 
     yieldctx = inspect.isgenerator(res)
     if yieldctx:
@@ -88,6 +101,8 @@ def call_fixture_func(fixturefunc, request, kwargs):
         res = next(it)
         finalizer = functools.partial(_teardown_yield_fixture, fixturefunc, it)
         request.addfinalizer(finalizer)
+
+    Request.current_fixture_setup = None
 
     return res
 
