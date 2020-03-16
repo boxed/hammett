@@ -80,7 +80,22 @@ class Request:
         return self.additional_fixtures_wanted.add(s)
 
 
+def should_skip(_f):
+    if not hasattr(_f, 'hammett_markers'):
+        return False
+
+    for marker in _f.hammett_markers:
+        if marker.name == 'skip':
+            return True
+
+    return False
+
+
 def run_test(_name, _f, _module_request, **kwargs):
+    if should_skip(_f):
+        results['skipped'] += 1
+        return
+
     import colorama
     from hammett.impl import register_fixture
 
@@ -110,11 +125,9 @@ def run_test(_name, _f, _module_request, **kwargs):
         global success
         success = False
         print(colorama.Fore.RED)
-        if _verbose:
-            print('... Fail')
-        else:
-            print('F')
-
+        if not _verbose:
+            print()
+        print('Failed:', _name)
         import traceback
         traceback.print_exc()
         print(colorama.Style.RESET_ALL)

@@ -24,9 +24,9 @@ def fixture(*args, **kwargs):
         return decorator
 
 
-# TODO: fix this
+# This is a deprecated feature in pytest, but we'll keep it here for now
 def yield_fixture(*args, **kwargs):
-    pass
+    print('yield_fixture is a deprecated behavior, please just use fixture directly')
     return fixture(*args, **kwargs)
 
 
