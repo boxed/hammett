@@ -88,7 +88,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
     import inspect
     import functools
 
-    from hammett.__main__ import Request
+    from hammett import Request
     Request.current_fixture_setup = fixturefunc.__name__
 
     res = fixturefunc(**kwargs)
