@@ -1,33 +1,40 @@
 import unittest
 
-from hammett.impl import dependency_injection
+from hammett import fixture
+from hammett.impl import (
+    fixtures,
+    dependency_injection,
+)
 
 
-class Tests(unittest.TestCase):
+class FixtureDecoratorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        fixtures.clear()
 
-    def test_dependency_injection_simple(self):
-        fixtures = dict(
-            foo=lambda: 3,
-        )
+    def test_simplest(self):
+        assert 'foo' not in fixtures
 
-        assert dependency_injection(lambda foo: foo, fixtures) == (3)
+        @fixture
+        def foo():
+            return 3
 
-    def test_di_graph(self):
-        fixtures = dict(
-            bar=lambda foo: 1 + foo,
-            foo=lambda: 3,
-            baz=lambda foo, bar: foo + bar,
-        )
+        assert foo() == 3
+        assert 'foo' in fixtures
 
-        assert dependency_injection(lambda foo, bar, baz: (foo, bar, baz), fixtures) == (3, 4, 7)
+    def test_with_arg(self):
+        assert 'foo' not in fixtures
 
-    def test_di_does_not_call_unneeded_fixture(self):
-        def crash():
-            assert False
+        @fixture('bla')
+        def foo():
+            return 3
 
-        fixtures = dict(
-            crash=crash,
-            foo=lambda: 3,
-        )
+        assert foo() == 3
 
-        assert dependency_injection(lambda foo: foo, fixtures) == 3
+    def test_auto_use_is_called_but_not_passed(self):
+        assert 'foo' not in fixtures
+
+        @fixture(autouse=True)
+        def foo():
+            return 3
+
+        assert dependency_injection(lambda: 7, fixtures, {}) == 7

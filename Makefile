@@ -53,7 +53,8 @@ release-check:
 	python setup.py release_check
 
 venv:
-	tox -e venv
+	python3 -m venv venv
+	venv/bin/pip install -r requirements.txt
 
 run-examples: venv
 	venv/bin/python examples/manage.py migrate
