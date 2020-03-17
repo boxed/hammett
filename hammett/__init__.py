@@ -136,6 +136,42 @@ def should_skip(_f):
     return False
 
 
+def analyze_assert(tb):
+    # grab assert source line
+    with open(tb.tb_frame.f_code.co_filename) as f:
+        source = f.read().split('\n')
+
+    line_no = tb.tb_frame.f_lineno - 1
+    relevant_source = source[line_no]
+
+    # if it spans multiple lines grab them all
+    while not relevant_source.strip().startswith('assert '):
+        line_no -= 1
+        relevant_source = source[line_no] + '\n' + relevant_source
+
+    import ast
+    assert_statement = ast.parse(relevant_source.strip()).body[0]
+    print(relevant_source)
+    if assert_statement.test.left.__class__.__name__ == 'Call':
+        function_name = assert_statement.test.left.func.id
+        function = tb.tb_frame.f_locals.get(function_name)
+        if function is None:
+            function = tb.tb_frame.f_globals.get(function_name)
+        if function is None:
+            print('failed to analyze assert statement')
+            return
+
+        print()
+        print('--- Assert components ---')
+        from astunparse import unparse
+        left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+        print('left:')
+        print(f'   {left!r}')
+        right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+        print('right:')
+        print(f'   {right!r}')
+
+
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
         results['skipped'] += 1
@@ -194,6 +230,8 @@ def run_test(_name, _f, _module_request, **kwargs):
         if not _verbose:
             print()
         print('Failed:', _name)
+        print()
+
         import traceback
         traceback.print_exc()
 
@@ -209,6 +247,20 @@ def run_test(_name, _f, _module_request, **kwargs):
             print(hijacked_stderr.getvalue())
 
         print(colorama.Style.RESET_ALL)
+
+        import traceback
+        type, value, tb = sys.exc_info()
+        while tb.tb_next:
+            tb = tb.tb_next
+
+        print('--- Local variables ---')
+        for k, v in tb.tb_frame.f_locals.items():
+            print(f'{k}:')
+            print('   ', repr(v))
+
+        if type == AssertionError:
+            analyze_assert(tb)
+
         results['failed'] += 1
 
     req.teardown()
