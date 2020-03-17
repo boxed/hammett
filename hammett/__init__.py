@@ -41,10 +41,9 @@ def yield_fixture(*args, **kwargs):
     return fixture(*args, **kwargs)
 
 
-# TODO: implement optional message param
-def raises(expected_exception):
+def raises(expected_exception, match=None):
     from hammett.impl import RaisesContext
-    return RaisesContext(expected_exception)
+    return RaisesContext(expected_exception, match=match)
 
 
 def should_stop():

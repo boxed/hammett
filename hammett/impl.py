@@ -2,9 +2,10 @@ from hammett import MISSING
 
 
 class RaisesContext(object):
-    def __init__(self, expected_exception):
+    def __init__(self, expected_exception, match):
         self.expected_exception = expected_exception
         self.excinfo = None
+        self.match = match
 
     def __enter__(self):
         self.excinfo = ExceptionInfo()
@@ -14,6 +15,9 @@ class RaisesContext(object):
         __tracebackhide__ = True
         if tp[0] is None:
             assert False, f'Did not raise {self.expected_exception}'
+        if self.match:
+            import re
+            assert re.match(self.match, str(tp[1]))
         self.excinfo.value = tp[1]
         self.excinfo.type = tp[0]
         suppress_exception = issubclass(self.excinfo.type, self.expected_exception)
