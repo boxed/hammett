@@ -9,11 +9,19 @@ MISSING = object()
 
 _orig_stdout = sys.stdout
 _orig_stderr = sys.stderr
+_orig_print = print
 
 _verbose = False
-results = dict(success=0, failed=0, skipped=0, abort=0)
+results = None
 settings = {}
 _fail_fast = False
+_quiet = False
+
+
+def print(*args, **kwargs):
+    if _quiet:
+        return
+    _orig_print(*args, **kwargs)
 
 
 def fixture(*args, **kwargs):
@@ -149,26 +157,41 @@ def analyze_assert(tb):
         relevant_source = source[line_no] + '\n' + relevant_source
 
     import ast
-    assert_statement = ast.parse(relevant_source.strip()).body[0]
-    print(relevant_source)
-    if assert_statement.test.left.__class__.__name__ == 'Call':
-        function_name = assert_statement.test.left.func.id
-        function = tb.tb_frame.f_locals.get(function_name)
-        if function is None:
-            function = tb.tb_frame.f_globals.get(function_name)
-        if function is None:
-            print('failed to analyze assert statement')
-            return
+    try:
+        assert_statement = ast.parse(relevant_source.strip()).body[0]
+    except SyntaxError:
+        print('failed to analyze assert statement')
+        return
 
-        print()
-        print('--- Assert components ---')
-        from astunparse import unparse
-        left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-        print('left:')
-        print(f'   {left!r}')
-        right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-        print('right:')
-        print(f'   {right!r}')
+    # We only analyze further if it's a comparison
+    if assert_statement.test.__class__.__name__ != 'Compare':
+        return
+
+    # ...and if the left side is a function call
+    if assert_statement.test.left.__class__.__name__ != 'Call':
+        return
+
+    # ...and that function call isn't a method
+    if assert_statement.test.left.func.__class__.__name__ == 'Attribute':
+        return
+
+    function_name = assert_statement.test.left.func.id
+    function = tb.tb_frame.f_locals.get(function_name)
+    if function is None:
+        function = tb.tb_frame.f_globals.get(function_name)
+    if function is None:
+        print('failed to analyze assert statement')
+        return
+
+    print()
+    print('--- Assert components ---')
+    from astunparse import unparse
+    left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+    print('left:')
+    print(f'   {left!r}')
+    right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+    print('right:')
+    print(f'   {right!r}')
 
 
 def run_test(_name, _f, _module_request, **kwargs):
@@ -232,7 +255,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         print()
 
         import traceback
-        traceback.print_exc()
+        print(traceback.format_exc())
 
         print()
         if hijacked_stdout.getvalue():
@@ -247,18 +270,22 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         print(colorama.Style.RESET_ALL)
 
-        import traceback
-        type, value, tb = sys.exc_info()
-        while tb.tb_next:
-            tb = tb.tb_next
+        if not _quiet:
+            import traceback
+            type, value, tb = sys.exc_info()
+            while tb.tb_next:
+                tb = tb.tb_next
 
-        print('--- Local variables ---')
-        for k, v in tb.tb_frame.f_locals.items():
-            print(f'{k}:')
-            print('   ', repr(v))
+            print('--- Local variables ---')
+            for k, v in tb.tb_frame.f_locals.items():
+                print(f'{k}:')
+                try:
+                    print('   ', repr(v))
+                except Exception as e:
+                    print(f'   Error getting local variable repr: {e}')
 
-        if type == AssertionError:
-            analyze_assert(tb)
+            if type == AssertionError:
+                analyze_assert(tb)
 
         results['failed'] += 1
 
@@ -324,19 +351,28 @@ def read_settings():
     import importlib
     for x in settings['plugins'].strip().split('\n'):
         plugin = importlib.import_module(x + '.plugin')
-        plugin.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
-        plugin.pytest_configure()
+        try:
+            plugin.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
+            plugin.pytest_configure()
+        except Exception:
+            print(f'Loading plugin {x} failed: ')
+            import traceback
+            print(traceback.format_exc())
+            results['abort'] += 1
+            return
         importlib.import_module(x + '.fixtures')
 
 
-def main(verbose=False, fail_fast=False, filenames=None):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
 
-    global _fail_fast, _verbose
+    global _fail_fast, _verbose, _quiet, results
 
+    results = dict(success=0, failed=0, skipped=0, abort=0)
     _verbose = verbose
     _fail_fast = fail_fast
+    _quiet = quiet
 
     if filenames is None:
         from os import listdir
@@ -362,7 +398,14 @@ def main(verbose=False, fail_fast=False, filenames=None):
         spec = importlib.util.spec_from_file_location(module_name, test_filename)
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
+        try:
+            spec.loader.exec_module(module)
+        except Exception:
+            print(f'Failed to load module {module_name}:')
+            import traceback
+            print(traceback.format_exc())
+            results['abort'] += 1
+            break
 
         module_request = Request(scope='module', parent=session_request)
 
@@ -387,16 +430,19 @@ def main(verbose=False, fail_fast=False, filenames=None):
     return 1 if results['failed'] else 0
 
 
-def main_cli():
+def main_cli(args=None):
+    if args is None:
+        args = sys.argv[1:]
     from argparse import ArgumentParser
     parser = ArgumentParser(prog='hammett')
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
+    parser.add_argument('-q', dest='quiet', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
-    exit(main(verbose=args.verbose, fail_fast=args.fail_fast, filenames=args.filenames or None))
+    return main(verbose=args.verbose, fail_fast=args.fail_fast, quiet=args.quiet, filenames=args.filenames or None)
 
 
 if __name__ == '__main__':
-    main_cli()
+    exit(main_cli())
