@@ -56,6 +56,10 @@ def raises(expected_exception, match=None):
     return RaisesContext(expected_exception, match=match)
 
 
+def fail(message):
+    raise RuntimeError(message)
+
+
 def should_stop():
     return _fail_fast and (results['failed'] or results['abort'])
 
@@ -421,8 +425,15 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
 
         module_request = Request(scope='module', parent=session_request)
 
+        module_markers = getattr(module, 'pytestmark', [])
+        if not isinstance(module_markers, list):
+            module_markers = [module_markers]
+
         for name, f in list(module.__dict__.items()):
             if name.startswith('test_') and callable(f):
+                for m in module_markers:
+                    f = m(f)
+
                 execute_test_function(module_name + '.' + name, f, module_request)
             if should_stop():
                 break

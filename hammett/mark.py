@@ -14,6 +14,9 @@ class Marker:
         self.kwargs = kwargs
         self.name = name
 
+    def __repr__(self):
+        return f'hammett.{self.name}'
+
 
 def __getattr__(name: str):
     if name in __package__:
