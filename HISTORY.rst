@@ -10,6 +10,10 @@ Changelog
 
 * Fixes to be able to call hammett over and over in a single process even when the code on disk changes
 
+* Improved support for pytest.raises
+
+* Support for pytests `tmpdir` fixture
+
 * Misc fixes
 
 
