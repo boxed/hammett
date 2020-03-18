@@ -1,4 +1,5 @@
 import sys
+import os
 
 import hammett.mark as mark
 
@@ -10,6 +11,7 @@ MISSING = object()
 _orig_stdout = sys.stdout
 _orig_stderr = sys.stderr
 _orig_print = print
+_orig_cwd = os.getcwd()
 
 _verbose = False
 results = None
@@ -70,6 +72,7 @@ class Request:
         self.fixturenames = set()
         self.finalizers = []
         self.fixture_results = {}
+        self.funcargnames = []
 
         class Option:
             def __init__(self):
@@ -145,8 +148,16 @@ def should_skip(_f):
 
 def analyze_assert(tb):
     # grab assert source line
-    with open(tb.tb_frame.f_code.co_filename) as f:
-        source = f.read().split('\n')
+    try:
+        with open(tb.tb_frame.f_code.co_filename) as f:
+            source = f.read().split('\n')
+    except FileNotFoundError:
+        try:
+            with open(os.path.join(_orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
+                source = f.read().split('\n')
+        except FileNotFoundError:
+            print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
+            return
 
     line_no = tb.tb_frame.f_lineno - 1
     relevant_source = source[line_no]
@@ -160,7 +171,7 @@ def analyze_assert(tb):
     try:
         assert_statement = ast.parse(relevant_source.strip()).body[0]
     except SyntaxError:
-        print('failed to analyze assert statement')
+        print('Failed to analyze assert statement (SyntaxError)')
         return
 
     # We only analyze further if it's a comparison
@@ -169,18 +180,6 @@ def analyze_assert(tb):
 
     # ...and if the left side is a function call
     if assert_statement.test.left.__class__.__name__ != 'Call':
-        return
-
-    # ...and that function call isn't a method
-    if assert_statement.test.left.func.__class__.__name__ == 'Attribute':
-        return
-
-    function_name = assert_statement.test.left.func.id
-    function = tb.tb_frame.f_locals.get(function_name)
-    if function is None:
-        function = tb.tb_frame.f_globals.get(function_name)
-    if function is None:
-        print('failed to analyze assert statement')
         return
 
     print()
@@ -215,7 +214,7 @@ def run_test(_name, _f, _module_request, **kwargs):
     hijacked_stderr = StringIO()
 
     if _verbose:
-        print(_name, end='')
+        print(_name + '...', end='', flush=True)
     try:
         from hammett.impl import (
             dependency_injection,
@@ -231,7 +230,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stderr = _orig_stderr
 
         if _verbose:
-            print(f'... {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
+            print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
         else:
             print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
         results['success'] += 1
@@ -289,6 +288,8 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         results['failed'] += 1
 
+    # Tests can change this which breaks everything. Reset!
+    os.chdir(_orig_cwd)
     req.teardown()
 
 
@@ -318,10 +319,14 @@ def execute_test_function(_name, _f, module_request):
 def read_settings():
     from configparser import (
         ConfigParser,
+        NoSectionError,
     )
     config_parser = ConfigParser()
     config_parser.read('setup.cfg')
-    settings.update(dict(config_parser.items('hammett')))
+    try:
+        settings.update(dict(config_parser.items('hammett')))
+    except NoSectionError:
+        return
 
     # load plugins
     if 'plugins' not in settings:
@@ -344,6 +349,8 @@ def read_settings():
             s.itv = True
             s.ds = settings['django_settings_module']
             s.dc = None
+            s.version = False
+            s.help = False
             return s
 
     parser = Parser()
@@ -375,12 +382,17 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
     _quiet = quiet
 
     if filenames is None:
-        from os import listdir
-        try:
-            filenames = ['tests/' + x for x in sorted(listdir('tests'))]
-        except FileNotFoundError:
+        from os.path import (
+            exists,
+            join,
+        )
+        if not exists('tests'):
             print('No tests found')
             return 1
+
+        filenames = []
+        for root, dirs, files in os.walk('tests/'):
+            filenames.extend(join(root, x) for x in files)
 
     read_settings()
     from os.path import split, sep
@@ -409,8 +421,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
 
         module_request = Request(scope='module', parent=session_request)
 
-        for name, f in module.__dict__.items():
-            if name.startswith('test_'):
+        for name, f in list(module.__dict__.items()):
+            if name.startswith('test_') and callable(f):
                 execute_test_function(module_name + '.' + name, f, module_request)
             if should_stop():
                 break
@@ -427,6 +439,9 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
     if not _verbose:
         print()
     print(f'{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped')
+    if results['abort']:
+        return 2
+
     return 1 if results['failed'] else 0
 
 

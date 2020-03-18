@@ -59,6 +59,12 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     fixtures[name] = fixture
 
 
+from hammett import fixtures as built_in_fixtures
+for fixture_name, fixture in built_in_fixtures.__dict__.items():
+    if not fixture_name.startswith('_'):
+        register_fixture(fixture)
+
+
 def pick_keys(kwargs, params):
     return {
         k: v
@@ -93,6 +99,9 @@ def _teardown_yield_fixture(fixturefunc, it):
 
 
 def call_fixture_func(fixturefunc, request, kwargs):
+    # TODO: this fixture crashes for some reason, blacklist it for now
+    if fixturefunc.__name__ == '_dj_autoclear_mailbox':
+        return None
     existing_result = request.hammett_get_existing_result(fixture_function_name(fixturefunc))
     if existing_result is not MISSING:
         return existing_result
@@ -120,6 +129,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
 
 
 def dependency_injection(f, fixtures, orig_kwargs, request):
+    fixtures = fixtures.copy()
     f_params = params_of(f)
     params_by_name = {
         name: params_of(fixture)
@@ -141,6 +151,13 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
     while params_by_name:
         reduced = False
         for name, params in list(params_by_name.items()):
+            # If we have a dependency that we have pruned, unprune it
+            for param in params:
+                if param not in kwargs:
+                    assert param in fixtures
+                    params_by_name[param] = params_of(fixtures[param])
+                    break
+            # If we can resolve this dependency fully
             if params.issubset(set(kwargs.keys())):
                 assert name not in kwargs
                 kwargs[name] = call_fixture_func(fixtures[name], request, pick_keys(kwargs, params))
@@ -151,7 +168,7 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
                 reduced = True
                 del params_by_name[name]
         if not reduced:
-            raise FixturesUnresolvableException(f'Could not resolve fixtures any more, have {params_by_name.keys()} left')
+            raise FixturesUnresolvableException(f'Could not resolve fixtures any more, have {params_by_name} left.\nAvailable dependencies: {kwargs.keys()}')
 
     if request is not None:
         request.fixturenames = set(kwargs.keys())

@@ -16,8 +16,8 @@ class Marker:
 
 
 def __getattr__(name: str):
-    if name == 'parametrize':
-        return parametrize
+    if name in __package__:
+        return __package__[name]
 
     else:
         def marker(*args, **kwargs):
