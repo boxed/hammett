@@ -1,20 +1,7 @@
 import os
 import sys
 
-from hammett import (
-    MISSING,
-    _fail_fast,
-    results,
-    _orig_cwd,
-    print,
-    Request,
-    _verbose,
-    _orig_stdout,
-    _orig_stderr,
-    _quiet,
-    _drop_into_debugger,
-    settings,
-)
+import hammett
 
 
 class RaisesContext(object):
@@ -68,6 +55,8 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     name = fixture_function_name(fixture)
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
+    if hammett._verbose and name in fixtures:
+        hammett.print(f'{fixture} shadows {fixtures[name]}')
     if autouse:
         auto_use_fixtures.add(name)
     assert scope in ('function', 'class', 'module', 'package', 'session')
@@ -110,7 +99,7 @@ def _teardown_yield_fixture(fixturefunc, it):
     except StopIteration:
         pass
     else:
-        print(f"yield_fixture {fixturefunc} function has more than one 'yield'")
+        hammett.print(f"yield_fixture {fixturefunc} function has more than one 'yield'")
         exit(1)
 
 
@@ -119,7 +108,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
     if fixturefunc.__name__ == '_dj_autoclear_mailbox':
         return None
     existing_result = request.hammett_get_existing_result(fixture_function_name(fixturefunc))
-    if existing_result is not MISSING:
+    if existing_result is not hammett.MISSING:
         return existing_result
 
     import inspect
@@ -194,7 +183,7 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
 
 
 def should_stop():
-    return _fail_fast and (results['failed'] or results['abort'])
+    return hammett._fail_fast and (hammett.results['failed'] or hammett.results['abort'])
 
 
 def should_skip(_f):
@@ -215,10 +204,10 @@ def analyze_assert(tb):
             source = f.read().split('\n')
     except FileNotFoundError:
         try:
-            with open(os.path.join(_orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
+            with open(os.path.join(hammett._orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
                 source = f.read().split('\n')
         except FileNotFoundError:
-            print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
+            hammett.print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
             return
 
     line_no = tb.tb_frame.f_lineno - 1
@@ -233,7 +222,7 @@ def analyze_assert(tb):
     try:
         assert_statement = ast.parse(relevant_source.strip()).body[0]
     except SyntaxError:
-        print('Failed to analyze assert statement (SyntaxError)')
+        hammett.print('Failed to analyze assert statement (SyntaxError)')
         return
 
     # We only analyze further if it's a comparison
@@ -244,27 +233,27 @@ def analyze_assert(tb):
     if assert_statement.test.left.__class__.__name__ != 'Call':
         return
 
-    print()
-    print('--- Assert components ---')
+    hammett.print()
+    hammett.print('--- Assert components ---')
     from astunparse import unparse
     left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-    print('left:')
-    print(f'   {left!r}')
+    hammett.print('left:')
+    hammett.print(f'   {left!r}')
     right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-    print('right:')
-    print(f'   {right!r}')
+    hammett.print('right:')
+    hammett.print(f'   {right!r}')
 
 
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        results['skipped'] += 1
+        hammett.results['skipped'] += 1
         return
 
     import colorama
     from io import StringIO
     from hammett.impl import register_fixture
 
-    req = Request(scope='function', parent=_module_request, function=_f)
+    req = hammett.Request(scope='function', parent=_module_request, function=_f)
 
     def request():
         return req
@@ -275,8 +264,8 @@ def run_test(_name, _f, _module_request, **kwargs):
     hijacked_stdout = StringIO()
     hijacked_stderr = StringIO()
 
-    if _verbose:
-        print(_name + '...', end='', flush=True)
+    if hammett._verbose:
+        hammett.print(_name + '...', end='', flush=True)
     try:
         from hammett.impl import (
             dependency_injection,
@@ -288,77 +277,75 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         dependency_injection(_f, fixtures, kwargs, request=req)
 
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
+        sys.stdout = hammett._orig_stdout
+        sys.stderr = hammett._orig_stderr
 
-        if _verbose:
-            print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
+        if hammett._verbose:
+            hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
         else:
-            print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
-        results['success'] += 1
+            hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
+        hammett.results['success'] += 1
     except KeyboardInterrupt:
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
+        sys.stdout = hammett._orig_stdout
+        sys.stderr = hammett._orig_stderr
 
-        print()
-        print('ABORTED')
-        global _fail_fast
-        _fail_fast = True
-        results['abort'] += 1
+        hammett.print()
+        hammett.print('ABORTED')
+        hammett.results['abort'] += 1
     except:
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
+        sys.stdout = hammett._orig_stdout
+        sys.stderr = hammett._orig_stderr
 
-        print(colorama.Fore.RED)
-        if not _verbose:
-            print()
-        print('Failed:', _name)
-        print()
+        hammett.print(colorama.Fore.RED)
+        if not hammett._verbose:
+            hammett.print()
+        hammett.print('Failed:', _name)
+        hammett.print()
 
         import traceback
-        print(traceback.format_exc())
+        hammett.print(traceback.format_exc())
 
-        print()
+        hammett.print()
         if hijacked_stdout.getvalue():
-            print(colorama.Fore.YELLOW)
-            print('--- stdout ---')
-            print(hijacked_stdout.getvalue())
+            hammett.print(colorama.Fore.YELLOW)
+            hammett.print('--- stdout ---')
+            hammett.print(hijacked_stdout.getvalue())
 
         if hijacked_stderr.getvalue():
-            print(colorama.Fore.RED)
-            print('--- stderr ---')
-            print(hijacked_stderr.getvalue())
+            hammett.print(colorama.Fore.RED)
+            hammett.print('--- stderr ---')
+            hammett.print(hijacked_stderr.getvalue())
 
-        print(colorama.Style.RESET_ALL)
+        hammett.print(colorama.Style.RESET_ALL)
 
-        if not _quiet:
+        if not hammett._quiet:
             import traceback
             type, value, tb = sys.exc_info()
             while tb.tb_next:
                 tb = tb.tb_next
 
-            print('--- Local variables ---')
+            hammett.print('--- Local variables ---')
             for k, v in tb.tb_frame.f_locals.items():
-                print(f'{k}:')
+                hammett.print(f'{k}:')
                 try:
-                    print('   ', repr(v))
+                    hammett.print('   ', repr(v))
                 except Exception as e:
-                    print(f'   Error getting local variable repr: {e}')
+                    hammett.print(f'   Error getting local variable repr: {e}')
 
             if type == AssertionError:
                 analyze_assert(tb)
 
-        if _drop_into_debugger:
+        if hammett._drop_into_debugger:
             try:
                 import ipdb as pdb
             except ImportError:
                 import pdb
             pdb.set_trace()
 
-        results['failed'] += 1
+        hammett.results['failed'] += 1
 
     # Tests can change this which breaks everything. Reset!
-    os.chdir(_orig_cwd)
+    os.chdir(hammett._orig_cwd)
     req.teardown()
 
 
@@ -385,6 +372,66 @@ def execute_test_function(_name, _f, module_request):
         return run_test(_name, _f, module_request)
 
 
+class FakePytestParser:
+    def parse_known_args(self, *args):
+        class Fake:
+            pass
+        s = Fake()
+        s.itv = True
+        s.ds = hammett.settings['django_settings_module']
+        s.dc = None
+        s.version = False
+        s.help = False
+        return s
+
+
+class EarlyConfig:
+    def __init__(self):
+        self.inicfg = self
+        self.config = self
+        self.path = hammett._orig_cwd
+
+    def addinivalue_line(self, name, doc):
+        pass
+
+    def getini(self, name):
+        return None
+
+
+early_config = EarlyConfig()
+
+
+def load_plugin(module_name):
+    import importlib
+    try:
+        plugin_module = importlib.import_module(module_name+'.plugin')
+    except ImportError:
+        plugin_module = importlib.import_module(module_name)
+
+    parser = FakePytestParser()
+    try:
+        if hasattr(plugin_module, 'pytest_load_initial_conftests'):
+            plugin_module.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
+
+        if hasattr(plugin_module, 'pytest_configure'):
+            import inspect
+            if inspect.signature(plugin_module.pytest_configure).parameters:
+                plugin_module.pytest_configure(early_config)
+            else:
+                plugin_module.pytest_configure()
+    except Exception:
+        hammett.print(f'Loading plugin {module_name} failed: ')
+        import traceback
+        hammett.print(traceback.format_exc())
+        hammett.results['abort'] += 1
+        return
+    try:
+        importlib.import_module(module_name + '.fixtures')
+    except ImportError:
+        pass
+    return True
+
+
 def read_settings():
     from configparser import (
         ConfigParser,
@@ -393,56 +440,17 @@ def read_settings():
     config_parser = ConfigParser()
     config_parser.read('setup.cfg')
     try:
-        settings.update(dict(config_parser.items('hammett')))
+        hammett.settings.update(dict(config_parser.items('hammett')))
     except NoSectionError:
         return
 
     # load plugins
-    if 'plugins' not in settings:
+    if 'plugins' not in hammett.settings:
         return
 
-    class EarlyConfig:
-        def addinivalue_line(self, name, doc):
-            pass
-
-        def getini(self, name):
-            return None
-
-    early_config = EarlyConfig()
-
-    class Parser:
-        def parse_known_args(self, *args):
-            class Fake:
-                pass
-            s = Fake()
-            s.itv = True
-            s.ds = settings['django_settings_module']
-            s.dc = None
-            s.version = False
-            s.help = False
-            return s
-
-    parser = Parser()
-
-    def load_plugin(plugin):
-        try:
-            plugin.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
-            plugin.pytest_configure()
-        except Exception:
-            print(f'Loading plugin {x} failed: ')
-            import traceback
-            print(traceback.format_exc())
-            results['abort'] += 1
-            return
-        try:
-            importlib.import_module(x + '.fixtures')
-        except ImportError:
-            pass
-        return True
-
     import importlib
-    for x in settings['plugins'].strip().split('\n'):
-        load_plugin(importlib.import_module(x + '.plugin'))
+    for plugin in hammett.settings['plugins'].strip().split('\n'):
+        load_plugin(plugin)
         if should_stop():
             return
 
@@ -452,8 +460,8 @@ def read_settings():
         conftest = None
 
     if conftest is not None:
-        plugins = getattr(conftest, 'plugins', [])
+        plugins = getattr(conftest, 'pytest_plugins', [])
         for plugin in plugins:
-            load_plugin(importlib.import_module(plugin))
+            load_plugin(plugin)
             if should_stop():
                 return

@@ -6,12 +6,6 @@ import hammett.mark as mark
 
 __version__ = '0.3.0'
 
-from hammett import should_stop
-from hammett.impl import (
-    should_stop,
-    execute_test_function,
-    read_settings,
-)
 
 MISSING = object()
 
@@ -147,6 +141,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
 
+    from hammett.impl import should_stop
+
     global _fail_fast, _verbose, _quiet, results, _drop_into_debugger
 
     results = dict(success=0, failed=0, skipped=0, abort=0)
@@ -168,6 +164,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         for root, dirs, files in os.walk('tests/'):
             filenames.extend(join(root, x) for x in files)
 
+    from hammett.impl import read_settings
     read_settings()
     from os.path import split, sep
 
@@ -199,6 +196,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         if not isinstance(module_markers, list):
             module_markers = [module_markers]
 
+        from hammett.impl import execute_test_function
         for name, f in list(module.__dict__.items()):
             if name.startswith('test_') and callable(f):
                 for m in module_markers:
