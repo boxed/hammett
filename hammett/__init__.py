@@ -6,6 +6,13 @@ import hammett.mark as mark
 
 __version__ = '0.3.0'
 
+from hammett import should_stop
+from hammett.impl import (
+    should_stop,
+    execute_test_function,
+    read_settings,
+)
+
 MISSING = object()
 
 _orig_stdout = sys.stdout
@@ -59,10 +66,6 @@ def raises(expected_exception, match=None):
 
 def fail(message):
     raise RuntimeError(message)
-
-
-def should_stop():
-    return _fail_fast and (results['failed'] or results['abort'])
 
 
 class Request:
@@ -138,268 +141,6 @@ class Request:
 
     def getfixturevalue(self, s):
         return self.additional_fixtures_wanted.add(s)
-
-
-def should_skip(_f):
-    if not hasattr(_f, 'hammett_markers'):
-        return False
-
-    for marker in _f.hammett_markers:
-        if marker.name == 'skip':
-            return True
-
-    return False
-
-
-def analyze_assert(tb):
-    # grab assert source line
-    try:
-        with open(tb.tb_frame.f_code.co_filename) as f:
-            source = f.read().split('\n')
-    except FileNotFoundError:
-        try:
-            with open(os.path.join(_orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
-                source = f.read().split('\n')
-        except FileNotFoundError:
-            print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
-            return
-
-    line_no = tb.tb_frame.f_lineno - 1
-    relevant_source = source[line_no]
-
-    # if it spans multiple lines grab them all
-    while not relevant_source.strip().startswith('assert '):
-        line_no -= 1
-        relevant_source = source[line_no] + '\n' + relevant_source
-
-    import ast
-    try:
-        assert_statement = ast.parse(relevant_source.strip()).body[0]
-    except SyntaxError:
-        print('Failed to analyze assert statement (SyntaxError)')
-        return
-
-    # We only analyze further if it's a comparison
-    if assert_statement.test.__class__.__name__ != 'Compare':
-        return
-
-    # ...and if the left side is a function call
-    if assert_statement.test.left.__class__.__name__ != 'Call':
-        return
-
-    print()
-    print('--- Assert components ---')
-    from astunparse import unparse
-    left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-    print('left:')
-    print(f'   {left!r}')
-    right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-    print('right:')
-    print(f'   {right!r}')
-
-
-def run_test(_name, _f, _module_request, **kwargs):
-    if should_skip(_f):
-        results['skipped'] += 1
-        return
-
-    import colorama
-    from io import StringIO
-    from hammett.impl import register_fixture
-
-    req = Request(scope='function', parent=_module_request, function=_f)
-
-    def request():
-        return req
-
-    register_fixture(request, autouse=True)
-    del request
-
-    hijacked_stdout = StringIO()
-    hijacked_stderr = StringIO()
-
-    if _verbose:
-        print(_name + '...', end='', flush=True)
-    try:
-        from hammett.impl import (
-            dependency_injection,
-            fixtures,
-        )
-
-        sys.stdout = hijacked_stdout
-        sys.stderr = hijacked_stderr
-
-        dependency_injection(_f, fixtures, kwargs, request=req)
-
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
-
-        if _verbose:
-            print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
-        else:
-            print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
-        results['success'] += 1
-    except KeyboardInterrupt:
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
-
-        print()
-        print('ABORTED')
-        global _fail_fast
-        _fail_fast = True
-        results['abort'] += 1
-    except:
-        sys.stdout = _orig_stdout
-        sys.stderr = _orig_stderr
-
-        print(colorama.Fore.RED)
-        if not _verbose:
-            print()
-        print('Failed:', _name)
-        print()
-
-        import traceback
-        print(traceback.format_exc())
-
-        print()
-        if hijacked_stdout.getvalue():
-            print(colorama.Fore.YELLOW)
-            print('--- stdout ---')
-            print(hijacked_stdout.getvalue())
-
-        if hijacked_stderr.getvalue():
-            print(colorama.Fore.RED)
-            print('--- stderr ---')
-            print(hijacked_stderr.getvalue())
-
-        print(colorama.Style.RESET_ALL)
-
-        if not _quiet:
-            import traceback
-            type, value, tb = sys.exc_info()
-            while tb.tb_next:
-                tb = tb.tb_next
-
-            print('--- Local variables ---')
-            for k, v in tb.tb_frame.f_locals.items():
-                print(f'{k}:')
-                try:
-                    print('   ', repr(v))
-                except Exception as e:
-                    print(f'   Error getting local variable repr: {e}')
-
-            if type == AssertionError:
-                analyze_assert(tb)
-
-        if _drop_into_debugger:
-            try:
-                import ipdb as pdb
-            except ImportError:
-                import pdb
-            pdb.set_trace()
-
-        results['failed'] += 1
-
-    # Tests can change this which breaks everything. Reset!
-    os.chdir(_orig_cwd)
-    req.teardown()
-
-
-def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
-    if not _stack:
-        param_names = [f'{k}={v}' for k, v in kwargs.items()]
-        _name = f'{_name}[{", ".join(param_names)}]'
-        return run_test(_name, _f, _module_request=_module_request, **kwargs)
-
-    names, param_list = _stack[0]
-    names = [x.strip() for x in names.split(',')]
-    for params in param_list:
-        if not isinstance(params, (list, tuple)):
-            params = [params]
-        execute_parametrize(_name, _f, _stack[1:], _module_request, **{**dict(zip(names, params)), **kwargs})
-        if should_stop():
-            break
-
-
-def execute_test_function(_name, _f, module_request):
-    if getattr(_f, 'hammett_parametrize_stack', None):
-        return execute_parametrize(_name, _f, _f.hammett_parametrize_stack, module_request)
-    else:
-        return run_test(_name, _f, module_request)
-
-
-def read_settings():
-    from configparser import (
-        ConfigParser,
-        NoSectionError,
-    )
-    config_parser = ConfigParser()
-    config_parser.read('setup.cfg')
-    try:
-        settings.update(dict(config_parser.items('hammett')))
-    except NoSectionError:
-        return
-
-    # load plugins
-    if 'plugins' not in settings:
-        return
-
-    class EarlyConfig:
-        def addinivalue_line(self, name, doc):
-            pass
-
-        def getini(self, name):
-            return None
-
-    early_config = EarlyConfig()
-
-    class Parser:
-        def parse_known_args(self, *args):
-            class Fake:
-                pass
-            s = Fake()
-            s.itv = True
-            s.ds = settings['django_settings_module']
-            s.dc = None
-            s.version = False
-            s.help = False
-            return s
-
-    parser = Parser()
-
-    def load_plugin(plugin):
-        try:
-            plugin.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
-            plugin.pytest_configure()
-        except Exception:
-            print(f'Loading plugin {x} failed: ')
-            import traceback
-            print(traceback.format_exc())
-            results['abort'] += 1
-            return
-        try:
-            importlib.import_module(x + '.fixtures')
-        except ImportError:
-            pass
-        return True
-
-    import importlib
-    for x in settings['plugins'].strip().split('\n'):
-        load_plugin(importlib.import_module(x + '.plugin'))
-        if should_stop():
-            return
-
-    try:
-        conftest = importlib.import_module('conftest')
-    except ImportError:
-        conftest = None
-
-    if conftest is not None:
-        plugins = getattr(conftest, 'plugins', [])
-        for plugin in plugins:
-            load_plugin(importlib.import_module(plugin))
-            if should_stop():
-                return
 
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False):
@@ -483,6 +224,11 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         return 2
 
     return 1 if results['failed'] else 0
+
+
+def hookimpl(*_, **__):
+    print("WARNING: hookimpl is not implemented in hammett")
+    return lambda f: f
 
 
 def main_cli(args=None):
