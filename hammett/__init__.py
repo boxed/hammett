@@ -18,6 +18,7 @@ results = None
 settings = {}
 _fail_fast = False
 _quiet = False
+_drop_into_debugger = False
 
 
 def print(*args, **kwargs):
@@ -290,6 +291,13 @@ def run_test(_name, _f, _module_request, **kwargs):
             if type == AssertionError:
                 analyze_assert(tb)
 
+        if _drop_into_debugger:
+            try:
+                import ipdb as pdb
+            except ImportError:
+                import pdb
+            pdb.set_trace()
+
         results['failed'] += 1
 
     # Tests can change this which breaks everything. Reset!
@@ -359,9 +367,7 @@ def read_settings():
 
     parser = Parser()
 
-    import importlib
-    for x in settings['plugins'].strip().split('\n'):
-        plugin = importlib.import_module(x + '.plugin')
+    def load_plugin(plugin):
         try:
             plugin.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
             plugin.pytest_configure()
@@ -371,19 +377,42 @@ def read_settings():
             print(traceback.format_exc())
             results['abort'] += 1
             return
-        importlib.import_module(x + '.fixtures')
+        try:
+            importlib.import_module(x + '.fixtures')
+        except ImportError:
+            pass
+        return True
+
+    import importlib
+    for x in settings['plugins'].strip().split('\n'):
+        load_plugin(importlib.import_module(x + '.plugin'))
+        if should_stop():
+            return
+
+    try:
+        conftest = importlib.import_module('conftest')
+    except ImportError:
+        conftest = None
+
+    if conftest is not None:
+        plugins = getattr(conftest, 'plugins', [])
+        for plugin in plugins:
+            load_plugin(importlib.import_module(plugin))
+            if should_stop():
+                return
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False):
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
 
-    global _fail_fast, _verbose, _quiet, results
+    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger
 
     results = dict(success=0, failed=0, skipped=0, abort=0)
     _verbose = verbose
     _fail_fast = fail_fast
     _quiet = quiet
+    _drop_into_debugger = drop_into_debugger
 
     if filenames is None:
         from os.path import (
@@ -464,10 +493,17 @@ def main_cli(args=None):
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
+    parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
     args = parser.parse_args(args)
 
-    return main(verbose=args.verbose, fail_fast=args.fail_fast, quiet=args.quiet, filenames=args.filenames or None)
+    return main(
+        verbose=args.verbose,
+        fail_fast=args.fail_fast,
+        quiet=args.quiet,
+        filenames=args.filenames or None,
+        drop_into_debugger=args.drop_into_debugger,
+    )
 
 
 if __name__ == '__main__':
