@@ -229,10 +229,6 @@ def analyze_assert(tb):
     if assert_statement.test.__class__.__name__ != 'Compare':
         return
 
-    # ...and if the left side is a function call
-    if assert_statement.test.left.__class__.__name__ != 'Call':
-        return
-
     hammett.print()
     hammett.print('--- Assert components ---')
     from astunparse import unparse
