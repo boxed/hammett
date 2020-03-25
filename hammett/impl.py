@@ -242,7 +242,7 @@ def analyze_assert(tb):
     right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     hammett.print('right:')
     hammett.print(f'   {right!r}')
-    if len(left) > 200 and len(right) > 200 and '\n' in left:
+    if isinstance(left, str) and isinstance(right, str) and len(left) > 200 and len(right) > 200 and '\n' in left:
         print()
         print('--- Diff of left and right assert components ---')
         left_lines = left.split('\n')
