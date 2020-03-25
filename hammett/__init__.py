@@ -135,9 +135,14 @@ class Request:
         return self.additional_fixtures_wanted.add(s)
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False):
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
+
+    clean_up_sys_path = False
+    if os.getcwd() not in sys.path:
+        sys.path.insert(0, os.getcwd())
+        clean_up_sys_path = True
 
     from hammett.impl import should_stop
 
@@ -200,6 +205,10 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
                 for m in module_markers:
                     f = m(f)
 
+                if match is not None:
+                    if match not in name:
+                        continue
+
                 execute_test_function(module_name + '.' + name, f, module_request)
             if should_stop():
                 break
@@ -219,6 +228,9 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     color = colorama.Fore.GREEN
     if results['failed']:
         color = colorama.Fore.RED
+
+    if clean_up_sys_path:
+        del sys.path[0]
 
     print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
     if results['abort']:
@@ -240,6 +252,7 @@ def main_cli(args=None):
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
+    parser.add_argument('-k', dest='match', default=None)
     parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
     args = parser.parse_args(args)
@@ -250,6 +263,7 @@ def main_cli(args=None):
         quiet=args.quiet,
         filenames=args.filenames or None,
         drop_into_debugger=args.drop_into_debugger,
+        match=args.match,
     )
 
 
