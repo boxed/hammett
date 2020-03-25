@@ -163,12 +163,14 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             exists,
             join,
         )
-        if not exists('tests'):
+        if not exists('tests') and not exists('test'):
             print('No tests found')
             return 1
 
         filenames = []
         for root, dirs, files in os.walk('tests/'):
+            filenames.extend(join(root, x) for x in files)
+        for root, dirs, files in os.walk('test/'):
             filenames.extend(join(root, x) for x in files)
 
     from hammett.impl import read_settings
