@@ -232,6 +232,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         print()
     import colorama
     color = colorama.Fore.GREEN
+    if results['skipped']:
+        color = colorama.Fore.YELLOW
     if results['failed']:
         color = colorama.Fore.RED
 

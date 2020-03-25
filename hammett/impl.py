@@ -261,11 +261,16 @@ def analyze_assert(tb):
 
 
 def run_test(_name, _f, _module_request, **kwargs):
+    import colorama
+
     if should_skip(_f):
+        if hammett._verbose:
+            hammett.print(f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}')
+        else:
+            hammett.print(f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}', end='', flush=True)
         hammett.results['skipped'] += 1
         return
 
-    import colorama
     from io import StringIO
     from hammett.impl import register_fixture
 
