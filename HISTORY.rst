@@ -1,7 +1,27 @@
 Changelog
 ---------
 
-0.3.0 (????-??-??)
+0.4.0 (2020-03-25)
+~~~~~~~~~~~~~~~~~~
+
+* Implemented module level markers
+
+* Added --pdb command line arguement. This will try ipdb first, then pdb.
+
+* Added noop @pytest.hookimpl support
+
+* Improved feedback on assertion error
+
+* Added -k flag (it's a bit more naive then in pytest, but it's fine for now)
+
+* Implemented --durations
+
+* Added support for test/ folder
+
+* Corrected display for skipped
+
+
+0.3.0 (2020-03-18)
 ~~~~~~~~~~~~~~~~~~
 
 * New flag: -q for quiet. In this mode there is no output. This is useful for CI/mutation testing.
