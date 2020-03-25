@@ -55,7 +55,7 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     name = fixture_function_name(fixture)
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
-    if hammett._verbose and name in fixtures:
+    if hammett._verbose and name in fixtures and name != 'request':
         hammett.print(f'{fixture} shadows {fixtures[name]}')
     if autouse:
         auto_use_fixtures.add(name)
@@ -282,6 +282,9 @@ def run_test(_name, _f, _module_request, **kwargs):
     prev_stdout = sys.stdout
     prev_stderr = sys.stderr
 
+    from datetime import datetime
+    start = datetime.now()
+
     if hammett._verbose:
         hammett.print(_name + '...', end='', flush=True)
     try:
@@ -295,11 +298,15 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         dependency_injection(_f, fixtures, kwargs, request=req)
 
+        duration = ''
+        if hammett._durations:
+            hammett._durations_results.append((_name, datetime.now() - start))
+
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
 
         if hammett._verbose:
-            hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
+            hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}{duration}')
         else:
             hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
         hammett.results['success'] += 1

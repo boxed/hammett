@@ -13,11 +13,14 @@ _orig_print = print
 _orig_cwd = os.getcwd()
 
 _verbose = False
+_durations = False
+_terminal_width = None
 results = None
 settings = {}
 _fail_fast = False
 _quiet = False
 _drop_into_debugger = False
+_durations_results = []
 
 
 def print(*args, **kwargs):
@@ -135,7 +138,7 @@ class Request:
         return self.additional_fixtures_wanted.add(s)
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False, durations=False):
     import sys
     sys.modules['pytest'] = sys.modules['hammett']
 
@@ -146,13 +149,14 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     from hammett.impl import should_stop
 
-    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger
+    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations
 
     results = dict(success=0, failed=0, skipped=0, abort=0)
     _verbose = verbose
     _fail_fast = fail_fast
     _quiet = quiet
     _drop_into_debugger = drop_into_debugger
+    _durations = durations
 
     if filenames is None:
         from os.path import (
@@ -232,6 +236,14 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     if clean_up_sys_path:
         del sys.path[0]
 
+    if _durations:
+        limit = 10
+        print()
+        print(f'--- {limit} slowest tests ---')
+        _durations_results.sort(key=lambda x: x[1], reverse=True)
+        for name, time in _durations_results[:10]:
+            print(f'{time}   {name}')
+
     print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
     if results['abort']:
         return 2
@@ -253,6 +265,7 @@ def main_cli(args=None):
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
     parser.add_argument('-k', dest='match', default=None)
+    parser.add_argument('--durations', dest='durations', action='store_true', default=False)
     parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
     args = parser.parse_args(args)
@@ -264,6 +277,7 @@ def main_cli(args=None):
         filenames=args.filenames or None,
         drop_into_debugger=args.drop_into_debugger,
         match=args.match,
+        durations=args.durations,
     )
 
 
