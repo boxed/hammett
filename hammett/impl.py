@@ -214,9 +214,13 @@ def analyze_assert(tb):
     relevant_source = source[line_no]
 
     # if it spans multiple lines grab them all
-    while not relevant_source.strip().startswith('assert '):
+    while line_no and not relevant_source.strip().startswith('assert '):
         line_no -= 1
         relevant_source = source[line_no] + '\n' + relevant_source
+
+    if not relevant_source.strip().startswith('assert '):
+        hammett.print('Failed to analyze assert statement (Did not find the assert)')
+        return
 
     import ast
     try:
@@ -238,6 +242,22 @@ def analyze_assert(tb):
     right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     hammett.print('right:')
     hammett.print(f'   {right!r}')
+    if len(left) > 200 and len(right) > 200 and '\n' in left:
+        print()
+        print('--- Diff of left and right assert components ---')
+        left_lines = left.split('\n')
+        right_lines = right.split('\n')
+        from difflib import unified_diff
+        import colorama
+        for l in unified_diff(left_lines, right_lines, lineterm=''):
+            color = ''
+            if l:
+                color = {
+                    '+': colorama.Fore.GREEN,
+                    '-': colorama.Fore.RED,
+                    '@': colorama.Fore.MAGENTA,
+                }.get(l[0], '')
+            print(f'{color}{l}{colorama.Style.RESET_ALL}')
 
 
 def run_test(_name, _f, _module_request, **kwargs):
@@ -259,6 +279,8 @@ def run_test(_name, _f, _module_request, **kwargs):
 
     hijacked_stdout = StringIO()
     hijacked_stderr = StringIO()
+    prev_stdout = sys.stdout
+    prev_stderr = sys.stderr
 
     if hammett._verbose:
         hammett.print(_name + '...', end='', flush=True)
@@ -273,8 +295,8 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         dependency_injection(_f, fixtures, kwargs, request=req)
 
-        sys.stdout = hammett._orig_stdout
-        sys.stderr = hammett._orig_stderr
+        sys.stdout = prev_stdout
+        sys.stderr = prev_stderr
 
         if hammett._verbose:
             hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}')
@@ -282,15 +304,15 @@ def run_test(_name, _f, _module_request, **kwargs):
             hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
         hammett.results['success'] += 1
     except KeyboardInterrupt:
-        sys.stdout = hammett._orig_stdout
-        sys.stderr = hammett._orig_stderr
+        sys.stdout = prev_stdout
+        sys.stderr = prev_stderr
 
         hammett.print()
         hammett.print('ABORTED')
         hammett.results['abort'] += 1
     except:
-        sys.stdout = hammett._orig_stdout
-        sys.stderr = hammett._orig_stderr
+        sys.stdout = prev_stdout
+        sys.stderr = prev_stderr
 
         hammett.print(colorama.Fore.RED)
         if not hammett._verbose:
@@ -320,13 +342,15 @@ def run_test(_name, _f, _module_request, **kwargs):
             while tb.tb_next:
                 tb = tb.tb_next
 
-            hammett.print('--- Local variables ---')
-            for k, v in tb.tb_frame.f_locals.items():
-                hammett.print(f'{k}:')
-                try:
-                    hammett.print('   ', repr(v))
-                except Exception as e:
-                    hammett.print(f'   Error getting local variable repr: {e}')
+            local_variables = tb.tb_frame.f_locals
+            if local_variables:
+                hammett.print('--- Local variables ---')
+                for k, v in local_variables.items():
+                    hammett.print(f'{k}:')
+                    try:
+                        hammett.print('   ', repr(v))
+                    except Exception as e:
+                        hammett.print(f'   Error getting local variable repr: {e}')
 
             if type == AssertionError:
                 analyze_assert(tb)

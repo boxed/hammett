@@ -9,8 +9,6 @@ __version__ = '0.3.0'
 
 MISSING = object()
 
-_orig_stdout = sys.stdout
-_orig_stderr = sys.stderr
 _orig_print = print
 _orig_cwd = os.getcwd()
 
@@ -217,7 +215,12 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     if not _verbose:
         print()
-    print(f'{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped')
+    import colorama
+    color = colorama.Fore.GREEN
+    if results['failed']:
+        color = colorama.Fore.RED
+
+    print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
     if results['abort']:
         return 2
 
