@@ -140,6 +140,10 @@ class Request:
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False, durations=False):
     import sys
+    if sys.version_info[:2] < (3, 7):
+        print('hammett requires python 3.7 or later')
+        exit(999)
+
     sys.modules['pytest'] = sys.modules['hammett']
 
     clean_up_sys_path = False
