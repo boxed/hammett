@@ -25,11 +25,11 @@ jobs:
       script: make test
       dist: xenial
 
-    - stage: deploy
-      script: python setup.py sdist
-      deploy:
-        provider: pypi
-        user: "__token__"
-        on:
-          tags: true
-          repo: boxed/hammett
+#    - stage: deploy
+#      script: python setup.py sdist
+#      deploy:
+#        provider: pypi
+#        user: "__token__"
+#        on:
+#          tags: true
+#          repo: boxed/hammett
