@@ -197,6 +197,42 @@ def should_skip(_f):
     return False
 
 
+def indent(s, levels=1):
+    ind = '    ' * levels
+    return '\n'.join(ind + x for x in s.split('\n'))
+
+
+def pretty_format(x, _indent=0):
+    indent = '    ' * _indent
+    result = ''
+    if isinstance(x, dict):
+        if not x:
+            return '{}'
+        result += '{\n'
+        for k, v in x.items():
+            result += f'{indent}    {k!r}: {pretty_format(v, _indent + 1)},\n'
+        result += f'{indent}}}'
+        return result
+    elif isinstance(x, list):
+        if not x:
+            return '[]'
+        result += '[\n'
+        for v in x:
+            result += f'{indent}    {pretty_format(v, _indent + 1)},\n'
+        result += f'{indent}]'
+        return result
+    elif isinstance(x, tuple):
+        if not x:
+            return '(,)'
+        result += '(\n'
+        for v in x:
+            result += f'{indent}    {pretty_format(v, _indent + 1)},\n'
+        result += f'{indent})'
+        return result
+    else:
+        return repr(x)
+
+
 def analyze_assert(tb):
     # grab assert source line
     try:
@@ -238,10 +274,10 @@ def analyze_assert(tb):
     from astunparse import unparse
     left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     hammett.print('left:')
-    hammett.print(f'   {left!r}')
+    hammett.print(indent(pretty_format(left)))
     right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     hammett.print('right:')
-    hammett.print(f'   {right!r}')
+    hammett.print(indent(pretty_format(right)))
     if isinstance(left, str) and isinstance(right, str) and len(left) > 200 and len(right) > 200 and '\n' in left:
         print()
         print('--- Diff of left and right assert components ---')
@@ -360,7 +396,7 @@ def run_test(_name, _f, _module_request, **kwargs):
                 for k, v in local_variables.items():
                     hammett.print(f'{k}:')
                     try:
-                        hammett.print('   ', repr(v))
+                        hammett.print(indent(pretty_format(v)))
                     except Exception as e:
                         hammett.print(f'   Error getting local variable repr: {e}')
 
