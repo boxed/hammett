@@ -138,13 +138,32 @@ class Request:
         return self.additional_fixtures_wanted.add(s)
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False, durations=False):
+def parse_markers(markers):
+    if markers is None:
+        return None
+
+    def parse_one(s):
+        if '[' not in s:
+            return s, None
+
+        assert s.endswith(']')
+        base_name, _, name_plus_end_bracket = s.partition('[')
+        return base_name, name_plus_end_bracket[:-1]
+
+    # So far let's do something stupidly simple
+    markers = markers.split(';')
+    return dict(parse_one(m.strip()) for m in markers)
+
+
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False, durations=False, markers=None):
     import sys
     if sys.version_info[:2] < (3, 7):
         print('hammett requires python 3.7 or later')
         exit(999)
 
     sys.modules['pytest'] = sys.modules['hammett']
+
+    markers = parse_markers(markers)
 
     clean_up_sys_path = False
     if os.getcwd() not in sys.path:
@@ -153,7 +172,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     from hammett.impl import should_stop
 
-    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations
+    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations, _markers
 
     results = dict(success=0, failed=0, skipped=0, abort=0)
     _verbose = verbose
@@ -219,6 +238,22 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
                     if match not in name:
                         continue
 
+                if markers is not None:
+                    keep = False
+                    for f_marker in getattr(f, 'hammett_markers', []):
+                        if f_marker.name in markers:
+                            arg = markers[f_marker.name]
+                            if arg is not None:
+                                assert len(f_marker.args) == 1, 'hammett only supports filtering on single arguments to markers right now'
+                                if str(f_marker.args[0]) == arg:
+                                    keep = True
+                                    break
+                            else:
+                                keep = True
+                                break
+                    if not keep:
+                        continue
+
                 execute_test_function(module_name + '.' + name, f, module_request)
             if should_stop():
                 break
@@ -273,6 +308,7 @@ def main_cli(args=None):
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
     parser.add_argument('-k', dest='match', default=None)
+    parser.add_argument('-m', dest='markers', default=None)
     parser.add_argument('--durations', dest='durations', action='store_true', default=False)
     parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
@@ -286,6 +322,7 @@ def main_cli(args=None):
         drop_into_debugger=args.drop_into_debugger,
         match=args.match,
         durations=args.durations,
+        markers=args.markers,
     )
 
 
