@@ -1,6 +1,14 @@
 Changelog
 ---------
 
+0.5.0 (2020-03-30)
+~~~~~~~~~~~~~~~~~~
+
+* Implemented support for filtering tests based on markers. Also supports the marker[argument] syntax that goes beyond what pytest can do
+
+* Nicer output on failed tests
+
+
 0.4.0 (2020-03-25)
 ~~~~~~~~~~~~~~~~~~
 
