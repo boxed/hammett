@@ -27,7 +27,7 @@ _disable_assert_analyze = False
 def print(*args, **kwargs):
     if _quiet:
         return
-    _orig_print(*args, **kwargs)
+    _orig_print(*args, **kwargs, file=sys.__stdout__)
 
 
 def fixture(*args, **kwargs):
@@ -301,7 +301,6 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             print(f'{startup_time}   {name}')
 
         print()
-
 
     print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
     if results['abort']:

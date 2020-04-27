@@ -1,5 +1,7 @@
 import os
 import sys
+from unittest import SkipTest
+import colorama
 
 import hammett
 
@@ -304,15 +306,25 @@ def analyze_assert(tb):
             print(f'{color}{l}{colorama.Style.RESET_ALL}')
 
 
-def run_test(_name, _f, _module_request, **kwargs):
-    import colorama
+def inc_skipped():
+    if hammett._verbose:
+        hammett.print(f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}')
+    else:
+        hammett.print(f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}', end='', flush=True)
+    hammett.results['skipped'] += 1
 
+
+def inc_success(duration):
+    if hammett._verbose:
+        hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}{duration}')
+    else:
+        hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
+    hammett.results['success'] += 1
+
+
+def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        if hammett._verbose:
-            hammett.print(f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}')
-        else:
-            hammett.print(f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}', end='', flush=True)
-        hammett.results['skipped'] += 1
+        inc_skipped()
         return
 
     from io import StringIO
@@ -359,11 +371,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
 
-        if hammett._verbose:
-            hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}{duration}')
-        else:
-            hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
-        hammett.results['success'] += 1
+        inc_success(duration)
     except KeyboardInterrupt:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -371,6 +379,8 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print()
         hammett.print('ABORTED')
         hammett.results['abort'] += 1
+    except SkipTest:
+        inc_skipped()
     except:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
