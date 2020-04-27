@@ -179,7 +179,12 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
         request.fixturenames = set(kwargs.keys())
     # prune again, to get rid of auto use fixtures that f doesn't take
     kwargs = {k: v for k, v in kwargs.items() if k in f_params}
-    return f(**{**kwargs, **orig_kwargs})
+    return f, {**kwargs, **orig_kwargs}
+
+
+def dependency_injection_and_execute(f, fixtures, orig_kwargs, request):
+    f, kwargs = dependency_injection(f, fixtures, orig_kwargs, request)
+    return f(**kwargs)
 
 
 def should_stop():
@@ -234,6 +239,9 @@ def pretty_format(x, _indent=0):
 
 
 def analyze_assert(tb):
+    if hammett._disable_assert_analyze:
+        return
+
     # grab assert source line
     try:
         with open(tb.tb_frame.f_code.co_filename) as f:
@@ -323,25 +331,30 @@ def run_test(_name, _f, _module_request, **kwargs):
     prev_stdout = sys.stdout
     prev_stderr = sys.stderr
 
-    from datetime import datetime
-    start = datetime.now()
-
     if hammett._verbose:
         hammett.print(_name + '...', end='', flush=True)
     try:
         from hammett.impl import (
-            dependency_injection,
+            dependency_injection_and_execute,
             fixtures,
         )
 
         sys.stdout = hijacked_stdout
         sys.stderr = hijacked_stderr
 
-        dependency_injection(_f, fixtures, kwargs, request=req)
+        from datetime import datetime
+        start = datetime.now()
+
+        resolved_function, resolved_kwargs = dependency_injection(_f, fixtures, kwargs, request=req)
+
+        setup_time = datetime.now() - start
+        start = datetime.now()
+
+        resolved_function(**resolved_kwargs)
 
         duration = ''
         if hammett._durations:
-            hammett._durations_results.append((_name, datetime.now() - start))
+            hammett._durations_results.append((_name, datetime.now() - start, setup_time))
 
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr

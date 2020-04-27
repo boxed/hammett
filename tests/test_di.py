@@ -1,7 +1,7 @@
 import unittest
 
 from hammett import Request
-from hammett.impl import dependency_injection
+from hammett.impl import dependency_injection_and_execute
 
 
 class DITests(unittest.TestCase):
@@ -13,7 +13,7 @@ class DITests(unittest.TestCase):
 
         request = Request(scope='function', parent=None)
 
-        assert dependency_injection(lambda foo: foo, fixtures, {}, request=request) == 3
+        assert dependency_injection_and_execute(lambda foo: foo, fixtures, {}, request=request) == 3
 
     def test_di_graph(self):
         fixtures = dict(
@@ -24,7 +24,7 @@ class DITests(unittest.TestCase):
 
         request = Request(scope='function', parent=None)
 
-        assert dependency_injection(lambda foo, bar, baz: (foo, bar, baz), fixtures, {}, request=request) == (3, 4, 7)
+        assert dependency_injection_and_execute(lambda foo, bar, baz: (foo, bar, baz), fixtures, {}, request=request) == (3, 4, 7)
 
     def test_di_does_not_call_unneeded_fixture(self):
         def crash():
@@ -37,4 +37,4 @@ class DITests(unittest.TestCase):
 
         request = Request(scope='function', parent=None)
 
-        assert dependency_injection(lambda foo: foo, fixtures, {}, request=request) == 3
+        assert dependency_injection_and_execute(lambda foo: foo, fixtures, {}, request=request) == 3

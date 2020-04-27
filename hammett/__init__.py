@@ -21,6 +21,7 @@ _fail_fast = False
 _quiet = False
 _drop_into_debugger = False
 _durations_results = []
+_disable_assert_analyze = False
 
 
 def print(*args, **kwargs):
@@ -155,7 +156,7 @@ def parse_markers(markers):
     return dict(parse_one(m.strip()) for m in markers)
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=False, durations=False, markers=None):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False):
     import sys
     if sys.version_info[:2] < (3, 7):
         print('hammett requires python 3.7 or later')
@@ -172,7 +173,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     from hammett.impl import should_stop
 
-    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations, _markers
+    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations, _markers, _disable_assert_analyze
 
     results = dict(success=0, failed=0, skipped=0, abort=0)
     _verbose = verbose
@@ -180,6 +181,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     _quiet = quiet
     _drop_into_debugger = drop_into_debugger
     _durations = durations
+    _disable_assert_analyze = disable_assert_analyze
 
     if filenames is None:
         from os.path import (
@@ -210,9 +212,12 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         import importlib.util
         import sys
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
-        spec = importlib.util.spec_from_file_location(module_name, test_filename)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
+        if module_name not in sys.modules:
+            spec = importlib.util.spec_from_file_location(module_name, test_filename)
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+        else:
+            module = sys.modules[module_name]
         try:
             spec.loader.exec_module(module)
         except Exception:
@@ -260,7 +265,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
         module_request.teardown()
 
-        del sys.modules[module_name]
+        if module_unload:
+            del sys.modules[module_name]
 
         if should_stop():
             break
@@ -284,8 +290,18 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         print()
         print(f'--- {limit} slowest tests ---')
         _durations_results.sort(key=lambda x: x[1], reverse=True)
-        for name, time in _durations_results[:10]:
+        for name, time, _ in _durations_results[:10]:
             print(f'{time}   {name}')
+
+        print()
+        print(f'--- {limit} slowest startup times for tests ---')
+        print('Note: startup times might be shared cost so might show up unfairly')
+        _durations_results.sort(key=lambda x: x[2], reverse=True)
+        for name, _, startup_time in _durations_results[:10]:
+            print(f'{startup_time}   {name}')
+
+        print()
+
 
     print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
     if results['abort']:
@@ -310,6 +326,7 @@ def main_cli(args=None):
     parser.add_argument('-k', dest='match', default=None)
     parser.add_argument('-m', dest='markers', default=None)
     parser.add_argument('--durations', dest='durations', action='store_true', default=False)
+    parser.add_argument('--no-assert-analyze', dest='disable_assert_analyze', action='store_true', default=False)
     parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
     parser.add_argument(dest='filenames', nargs='*')
     args = parser.parse_args(args)
@@ -323,6 +340,7 @@ def main_cli(args=None):
         match=args.match,
         durations=args.durations,
         markers=args.markers,
+        disable_assert_analyze=args.disable_assert_analyze,
     )
 
 

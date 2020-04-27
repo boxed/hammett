@@ -6,7 +6,7 @@ from hammett import (
 )
 from hammett.impl import (
     fixtures,
-    dependency_injection,
+    dependency_injection_and_execute,
 )
 
 
@@ -42,4 +42,4 @@ class FixtureDecoratorTests(unittest.TestCase):
 
         request = Request(scope='function', parent=None)
 
-        assert dependency_injection(lambda: 7, fixtures, {}, request=request) == 7
+        assert dependency_injection_and_execute(lambda: 7, fixtures, {}, request=request) == 7
