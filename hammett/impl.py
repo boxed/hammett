@@ -272,8 +272,13 @@ def analyze_assert(tb):
     try:
         assert_statement = ast.parse(relevant_source.strip()).body[0]
     except SyntaxError:
-        hammett.print('Failed to analyze assert statement (SyntaxError)')
-        return
+        try:
+            # grab one more line after the the one where we got an exception, and try again
+            relevant_source += '\n' + source[tb.tb_frame.f_lineno]
+            assert_statement = ast.parse(relevant_source.strip()).body[0]
+        except SyntaxError:
+            hammett.print('Failed to analyze assert statement (SyntaxError)')
+            return
 
     # We only analyze further if it's a comparison
     if assert_statement.test.__class__.__name__ != 'Compare':
@@ -282,10 +287,14 @@ def analyze_assert(tb):
     hammett.print()
     hammett.print('--- Assert components ---')
     from astunparse import unparse
-    left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-    hammett.print('left:')
-    hammett.print(indent(pretty_format(left)))
-    right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+    try:
+        left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+        hammett.print('left:')
+        hammett.print(indent(pretty_format(left)))
+        right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
+    except Exception as e:
+        hammett.print(f'Failed to analyze assert statement ({type(e)}: {e})')
+        return
     hammett.print('right:')
     hammett.print(indent(pretty_format(right)))
     if isinstance(left, str) and isinstance(right, str) and len(left) > 200 and len(right) > 200 and '\n' in left:
