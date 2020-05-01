@@ -204,7 +204,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     session_request = Request(scope='session', parent=None)
 
-    for test_filename in filenames:
+    for test_filename in sorted(filenames):
         dirname, filename = split(test_filename)
         if not filename.startswith('test_') or not filename.endswith('.py'):
             continue
