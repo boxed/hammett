@@ -30,6 +30,10 @@ class RaisesContext(object):
 
 
 class ExceptionInfo:
+    def __init__(self):
+        self.type = None
+        self.value = None
+
     def __str__(self):
         return f'<ExceptionInfo: type={self.type} value={self.value}'
 
@@ -57,7 +61,7 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     name = fixture_function_name(fixture)
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
-    if hammett._verbose and name in fixtures and name != 'request':
+    if hammett.g.verbose and name in fixtures and name != 'request':
         hammett.print(f'{fixture} shadows {fixtures[name]}')
     if autouse:
         auto_use_fixtures.add(name)
@@ -190,7 +194,7 @@ def dependency_injection_and_execute(f, fixtures, orig_kwargs, request):
 
 
 def should_stop():
-    return hammett._fail_fast and (hammett.results['failed'] or hammett.results['abort'])
+    return hammett.g.fail_fast and (hammett.g.results['failed'] or hammett.g.results['abort'])
 
 
 def should_skip(_f):
@@ -241,7 +245,7 @@ def pretty_format(x, _indent=0):
 
 
 def analyze_assert(tb):
-    if hammett._disable_assert_analyze:
+    if hammett.g.disable_assert_analyze:
         return
 
     # grab assert source line
@@ -250,7 +254,7 @@ def analyze_assert(tb):
             source = f.read().split('\n')
     except FileNotFoundError:
         try:
-            with open(os.path.join(hammett._orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
+            with open(os.path.join(hammett.g.orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
                 source = f.read().split('\n')
         except FileNotFoundError:
             hammett.print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
@@ -316,19 +320,19 @@ def analyze_assert(tb):
 
 
 def inc_skipped():
-    if hammett._verbose:
+    if hammett.g.verbose:
         hammett.print(f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}')
     else:
         hammett.print(f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}', end='', flush=True)
-    hammett.results['skipped'] += 1
+    hammett.g.results['skipped'] += 1
 
 
 def inc_success(duration):
-    if hammett._verbose:
+    if hammett.g.verbose:
         hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}{duration}')
     else:
         hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
-    hammett.results['success'] += 1
+    hammett.g.results['success'] += 1
 
 
 def run_test(_name, _f, _module_request, **kwargs):
@@ -337,7 +341,6 @@ def run_test(_name, _f, _module_request, **kwargs):
         return
 
     from io import StringIO
-    from hammett.impl import register_fixture
 
     req = hammett.Request(scope='function', parent=_module_request, function=_f)
 
@@ -352,14 +355,9 @@ def run_test(_name, _f, _module_request, **kwargs):
     prev_stdout = sys.stdout
     prev_stderr = sys.stderr
 
-    if hammett._verbose:
+    if hammett.g.verbose:
         hammett.print(_name + '...', end='', flush=True)
     try:
-        from hammett.impl import (
-            dependency_injection_and_execute,
-            fixtures,
-        )
-
         sys.stdout = hijacked_stdout
         sys.stderr = hijacked_stderr
 
@@ -374,8 +372,8 @@ def run_test(_name, _f, _module_request, **kwargs):
         resolved_function(**resolved_kwargs)
 
         duration = ''
-        if hammett._durations:
-            hammett._durations_results.append((_name, datetime.now() - start, setup_time))
+        if hammett.g.durations:
+            hammett.g.durations_results.append((_name, datetime.now() - start, setup_time))
 
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -387,7 +385,7 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         hammett.print()
         hammett.print('ABORTED')
-        hammett.results['abort'] += 1
+        hammett.g.results['abort'] += 1
     except SkipTest:
         inc_skipped()
     except:
@@ -395,7 +393,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stderr = prev_stderr
 
         hammett.print(colorama.Fore.RED)
-        if not hammett._verbose:
+        if not hammett.g.verbose:
             hammett.print()
         hammett.print('Failed:', _name)
         hammett.print()
@@ -416,7 +414,7 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         hammett.print(colorama.Style.RESET_ALL)
 
-        if not hammett._quiet:
+        if not hammett.g.quiet:
             import traceback
             type, value, tb = sys.exc_info()
             while tb.tb_next:
@@ -435,17 +433,17 @@ def run_test(_name, _f, _module_request, **kwargs):
             if type == AssertionError:
                 analyze_assert(tb)
 
-        if hammett._drop_into_debugger:
+        if hammett.g.drop_into_debugger:
             try:
                 import ipdb as pdb
             except ImportError:
                 import pdb
             pdb.set_trace()
 
-        hammett.results['failed'] += 1
+        hammett.g.results['failed'] += 1
 
     # Tests can change this which breaks everything. Reset!
-    os.chdir(hammett._orig_cwd)
+    os.chdir(hammett.g.orig_cwd)
     req.teardown()
 
 
@@ -478,7 +476,7 @@ class FakePytestParser:
             pass
         s = Fake()
         s.itv = True
-        s.ds = hammett.settings['django_settings_module']
+        s.ds = hammett.g.settings['django_settings_module']
         s.dc = None
         s.version = False
         s.help = False
@@ -489,7 +487,7 @@ class EarlyConfig:
     def __init__(self):
         self.inicfg = self
         self.config = self
-        self.path = hammett._orig_cwd
+        self.path = hammett.g.orig_cwd
 
     def addinivalue_line(self, name, doc):
         pass
@@ -523,7 +521,7 @@ def load_plugin(module_name):
         hammett.print(f'Loading plugin {module_name} failed: ')
         import traceback
         hammett.print(traceback.format_exc())
-        hammett.results['abort'] += 1
+        hammett.g.results['abort'] += 1
         return
     try:
         importlib.import_module(module_name + '.fixtures')
@@ -540,16 +538,16 @@ def read_settings():
     config_parser = ConfigParser()
     config_parser.read('setup.cfg')
     try:
-        hammett.settings.update(dict(config_parser.items('hammett')))
+        hammett.g.settings.update(dict(config_parser.items('hammett')))
     except NoSectionError:
         return
 
     # load plugins
-    if 'plugins' not in hammett.settings:
+    if 'plugins' not in hammett.g.settings:
         return
 
     import importlib
-    for plugin in hammett.settings['plugins'].strip().split('\n'):
+    for plugin in hammett.g.settings['plugins'].strip().split('\n'):
         load_plugin(plugin)
         if should_stop():
             return

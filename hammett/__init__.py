@@ -1,5 +1,6 @@
 import sys
 import os
+from os.path import abspath
 
 import hammett.mark as mark
 
@@ -9,25 +10,30 @@ __version__ = '0.5.0'
 
 MISSING = object()
 
-_orig_print = print
-_orig_cwd = os.getcwd()
 
-_verbose = False
-_durations = False
-_terminal_width = None
-results = None
-settings = {}
-_fail_fast = False
-_quiet = False
-_drop_into_debugger = False
-_durations_results = []
-_disable_assert_analyze = False
+class Globals:
+    def __init__(self):
+        self.orig_print = print
+        self.orig_cwd = None
+        self.verbose = False
+        self.durations = False
+        self.terminal_width = None
+        self.results = None
+        self.settings = {}
+        self.fail_fast = False
+        self.quiet = False
+        self.drop_into_debugger = False
+        self.durations_results = []
+        self.disable_assert_analyze = False
+
+
+g = Globals()
 
 
 def print(*args, **kwargs):
-    if _quiet:
+    if g.quiet:
         return
-    _orig_print(*args, **kwargs, file=sys.__stdout__)
+    g.orig_print(*args, **kwargs, file=sys.__stdout__)
 
 
 def fixture(*args, **kwargs):
@@ -80,7 +86,7 @@ class Request:
 
         class Option:
             def __init__(self):
-                self.verbose = _verbose
+                self.verbose = g.verbose
 
         class Config:
             def __init__(self):
@@ -156,7 +162,7 @@ def parse_markers(markers):
     return dict(parse_one(m.strip()) for m in markers)
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
     import sys
     if sys.version_info[:2] < (3, 7):
         print('hammett requires python 3.7 or later')
@@ -167,21 +173,26 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     markers = parse_markers(markers)
 
     clean_up_sys_path = False
-    if os.getcwd() not in sys.path:
-        sys.path.insert(0, os.getcwd())
+
+    if cwd is None:
+        cwd = os.getcwd()
+    cwd = abspath(cwd)
+    g.orig_cwd = cwd
+    os.chdir(cwd)
+
+    if cwd not in sys.path:
+        sys.path.insert(0, cwd)
         clean_up_sys_path = True
 
     from hammett.impl import should_stop
 
-    global _fail_fast, _verbose, _quiet, results, _drop_into_debugger, _durations, _markers, _disable_assert_analyze
-
-    results = dict(success=0, failed=0, skipped=0, abort=0)
-    _verbose = verbose
-    _fail_fast = fail_fast
-    _quiet = quiet
-    _drop_into_debugger = drop_into_debugger
-    _durations = durations
-    _disable_assert_analyze = disable_assert_analyze
+    g.results = dict(success=0, failed=0, skipped=0, abort=0)
+    g.verbose = verbose
+    g.fail_fast = fail_fast
+    g.quiet = quiet
+    g.drop_into_debugger = drop_into_debugger
+    g.durations = durations
+    g.disable_assert_analyze = disable_assert_analyze
 
     if filenames is None:
         from os.path import (
@@ -224,7 +235,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             print(f'Failed to load module {module_name}:')
             import traceback
             print(traceback.format_exc())
-            results['abort'] += 1
+            g.results['abort'] += 1
             break
 
         module_request = Request(scope='module', parent=session_request)
@@ -273,40 +284,40 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     session_request.teardown()
 
-    if not _verbose:
+    if not g.verbose:
         print()
     import colorama
     color = colorama.Fore.GREEN
-    if results['skipped']:
+    if g.results['skipped']:
         color = colorama.Fore.YELLOW
-    if results['failed']:
+    if g.results['failed']:
         color = colorama.Fore.RED
 
     if clean_up_sys_path:
         del sys.path[0]
 
-    if _durations:
+    if g.durations:
         limit = 10
         print()
         print(f'--- {limit} slowest tests ---')
-        _durations_results.sort(key=lambda x: x[1], reverse=True)
-        for name, time, _ in _durations_results[:10]:
+        g.durations_results.sort(key=lambda x: x[1], reverse=True)
+        for name, time, _ in g.durations_results[:10]:
             print(f'{time}   {name}')
 
         print()
         print(f'--- {limit} slowest startup times for tests ---')
         print('Note: startup times might be shared cost so might show up unfairly')
-        _durations_results.sort(key=lambda x: x[2], reverse=True)
-        for name, _, startup_time in _durations_results[:10]:
+        g.durations_results.sort(key=lambda x: x[2], reverse=True)
+        for name, _, startup_time in g.durations_results[:10]:
             print(f'{startup_time}   {name}')
 
         print()
 
-    print(f'{color}{results["success"]} succeeded, {results["failed"]} failed, {results["skipped"]} skipped{colorama.Style.RESET_ALL}')
-    if results['abort']:
+    print(f'{color}{g.results["success"]} succeeded, {g.results["failed"]} failed, {g.results["skipped"]} skipped{colorama.Style.RESET_ALL}')
+    if g.results['abort']:
         return 2
 
-    return 1 if results['failed'] else 0
+    return 1 if g.results['failed'] else 0
 
 
 def hookimpl(*_, **__):
