@@ -25,6 +25,9 @@ class Globals:
         self.drop_into_debugger = False
         self.durations_results = []
         self.disable_assert_analyze = False
+        
+    def reset(self):
+        self.__init__()
 
 
 g = Globals()
@@ -185,7 +188,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         clean_up_sys_path = True
 
     from hammett.impl import should_stop
-
+    g.reset()
+    
     g.results = dict(success=0, failed=0, skipped=0, abort=0)
     g.verbose = verbose
     g.fail_fast = fail_fast
