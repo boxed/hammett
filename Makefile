@@ -36,7 +36,7 @@ test:
 	python -m unittest tests/test_*.py
 
 coverage:
-	tox -e coverage
+	coverage run --source=hammett -m unittest tests/test_*.py
 
 docs:
 	tox -e docs
