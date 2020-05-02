@@ -10,11 +10,12 @@ __version__ = '0.5.0'
 
 MISSING = object()
 
+_orig_print = print
+
 
 class Globals:
     def __init__(self):
-        self.orig_print = print
-        self.orig_cwd = None
+        self.orig_cwd = os.getcwd()
         self.verbose = False
         self.durations = False
         self.terminal_width = None
@@ -36,7 +37,7 @@ g = Globals()
 def print(*args, **kwargs):
     if g.quiet:
         return
-    g.orig_print(*args, **kwargs, file=sys.__stdout__)
+    _orig_print(*args, **kwargs, file=sys.__stdout__)
 
 
 def fixture(*args, **kwargs):
@@ -227,12 +228,12 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         import importlib.util
         import sys
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
-        if module_name not in sys.modules:
-            spec = importlib.util.spec_from_file_location(module_name, test_filename)
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[module_name] = module
-        else:
-            module = sys.modules[module_name]
+        if module_name in sys.modules:
+            del sys.modules[module_name]
+
+        spec = importlib.util.spec_from_file_location(module_name, test_filename)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
         try:
             spec.loader.exec_module(module)
         except Exception:
@@ -318,6 +319,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         print()
 
     print(f'{color}{g.results["success"]} succeeded, {g.results["failed"]} failed, {g.results["skipped"]} skipped{colorama.Style.RESET_ALL}')
+    os.chdir(g.orig_cwd)
+
     if g.results['abort']:
         return 2
 
