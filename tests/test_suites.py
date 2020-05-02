@@ -17,8 +17,8 @@ class SuitesTests(unittest.TestCase):
                 continue
 
             with self.subTest(d):
-                main(cwd=p, quiet=True)
+                exit_code = main(cwd=p, quiet=True)
                 with open(join(p, 'asserts.py')) as f:
                     asserts = f.read()
 
-                exec(asserts, {'g': g})
+                exec(asserts, {'g': g, 'exit_code': exit_code})

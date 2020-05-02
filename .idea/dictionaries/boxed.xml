@@ -2,6 +2,7 @@
   <dictionary name="boxed">
     <words>
       <w>conftest</w>
+      <w>pytestmark</w>
     </words>
   </dictionary>
 </component>

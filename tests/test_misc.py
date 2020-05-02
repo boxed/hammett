@@ -7,6 +7,8 @@ from hammett import (
 from hammett.impl import (
     fixtures,
     dependency_injection_and_execute,
+    indent,
+    pretty_format,
 )
 
 
@@ -43,3 +45,51 @@ class FixtureDecoratorTests(unittest.TestCase):
         request = Request(scope='function', parent=None)
 
         assert dependency_injection_and_execute(lambda: 7, fixtures, {}, request=request) == 7
+
+
+class MiscTests(unittest.TestCase):
+    def test_indent(self):
+        assert indent('foo') == '    foo'
+        assert indent('foo', levels=2) == '        foo'
+        assert indent('''foo
+    bar
+        baz''') == '''    foo
+        bar
+            baz'''
+
+    def test_pretty_format(self):
+        class Foo:
+            def __repr__(self):
+                return '<foo>'
+
+        assert pretty_format(dict(
+            foo=Foo(),
+            bar=dict(
+                foo=Foo(),
+            ),
+            baz=[1, 2, 3],
+            quux=(4, 5, [6]),
+            asd={},
+            qwe=[],
+            dfg=tuple(),
+        )) == '''{
+    'foo': <foo>,
+    'bar': {
+        'foo': <foo>,
+    },
+    'baz': [
+        1,
+        2,
+        3,
+    ],
+    'quux': (
+        4,
+        5,
+        [
+            6,
+        ],
+    ),
+    'asd': {},
+    'qwe': [],
+    'dfg': (,),
+}'''
