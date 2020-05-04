@@ -199,6 +199,14 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     g.durations = durations
     g.disable_assert_analyze = disable_assert_analyze
 
+    def handle_dir(result, d):
+        for root, dirs, files in os.walk(d):
+            files = [
+                f for f in files
+                if f.startswith('test_') and f.endswith('.py')
+            ]
+            result.extend(join(root, x) for x in files)
+
     if filenames is None:
         from os.path import (
             exists,
@@ -209,10 +217,18 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             return 1
 
         filenames = []
-        for root, dirs, files in os.walk('tests/'):
-            filenames.extend(join(root, x) for x in files)
-        for root, dirs, files in os.walk('test/'):
-            filenames.extend(join(root, x) for x in files)
+
+        handle_dir(filenames, 'tests/')
+        handle_dir(filenames, 'test/')
+    else:
+        orig_filenames = filenames
+        filenames = []
+
+        for filename in orig_filenames:
+            if os.path.isdir(filename):
+                handle_dir(filenames, filename)
+            else:
+                filenames.append(filename)
 
     from hammett.impl import read_settings
     read_settings()
@@ -222,8 +238,6 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     for test_filename in sorted(filenames):
         dirname, filename = split(test_filename)
-        if not filename.startswith('test_') or not filename.endswith('.py'):
-            continue
 
         import importlib.util
         import sys
