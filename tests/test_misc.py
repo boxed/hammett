@@ -2,6 +2,7 @@ import unittest
 
 from hammett import (
     fixture,
+    parse_markers,
     Request,
 )
 from hammett.impl import (
@@ -93,3 +94,6 @@ class MiscTests(unittest.TestCase):
     'qwe': [],
     'dfg': (,),
 }'''
+
+    def test_parse_markers(self):
+        assert parse_markers('foo;bar[5]') == {'foo': None, 'bar': '5'}
