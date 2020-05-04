@@ -1,6 +1,10 @@
 import sys
 import os
-from os.path import abspath
+from os.path import (
+    abspath,
+    exists,
+    join,
+)
 
 import hammett.mark as mark
 
@@ -208,10 +212,6 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             result.extend(join(root, x) for x in files)
 
     if filenames is None:
-        from os.path import (
-            exists,
-            join,
-        )
         if not exists('tests') and not exists('test'):
             print('No tests found')
             return 1
