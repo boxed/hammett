@@ -1,6 +1,22 @@
 Changelog
 ---------
 
+0.6.0 (2020-05-04)
+~~~~~~~~~~~~~~~~~~
+
+* Added --durations feature
+
+* Improvements to skipping tests
+
+* Run tests in lexiographic order
+
+* Better assertion analysis
+
+* You can now pass hammett a directory on the command line and it'll do the right thing
+
+* Support names parameter of mark.parametrize() being a list/tuple
+
+
 0.5.0 (2020-03-30)
 ~~~~~~~~~~~~~~~~~~
 
