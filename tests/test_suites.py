@@ -10,9 +10,10 @@ from hammett import main, g
 
 class SuitesTests(unittest.TestCase):
     def test_suites(self):
-        base = abspath('tests/suites')
-        for d in os.listdir(base):
-            p = os.path.join(base, d)
+        base = abspath('.')
+        suites_base = abspath('tests/suites')
+        for d in os.listdir(suites_base):
+            p = os.path.join(suites_base, d)
             if not os.path.isdir(p):
                 continue
 
@@ -21,4 +22,4 @@ class SuitesTests(unittest.TestCase):
                 with open(join(p, 'asserts.py')) as f:
                     asserts = f.read()
 
-                exec(asserts, {'g': g, 'exit_code': exit_code})
+                exec(asserts, {'g': g, 'exit_code': exit_code, 'base': base})

@@ -30,6 +30,7 @@ class Globals:
         self.drop_into_debugger = False
         self.durations_results = []
         self.disable_assert_analyze = False
+        self.output = []
         
     def reset(self):
         self.__init__()
@@ -38,10 +39,11 @@ class Globals:
 g = Globals()
 
 
-def print(*args, **kwargs):
+def print(*args, end='\n', flush=False):
+    g.output.append((args, end, flush))
     if g.quiet:
         return
-    _orig_print(*args, **kwargs, file=sys.__stdout__)
+    _orig_print(*args, end=end, flush=flush, file=sys.__stdout__)
 
 
 def fixture(*args, **kwargs):

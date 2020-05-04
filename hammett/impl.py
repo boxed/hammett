@@ -165,9 +165,9 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
             # If we have a dependency that we have pruned, unprune it
             for param in params:
                 if param not in kwargs:
-                    assert param in fixtures
-                    params_by_name[param] = params_of(fixtures[param])
-                    break
+                    if param in fixtures:
+                        params_by_name[param] = params_of(fixtures[param])
+                        break
             # If we can resolve this dependency fully
             if params.issubset(set(kwargs.keys())):
                 assert name not in kwargs
@@ -302,8 +302,8 @@ def analyze_assert(tb):
     hammett.print('right:')
     hammett.print(indent(pretty_format(right)))
     if isinstance(left, str) and isinstance(right, str) and len(left) > 200 and len(right) > 200 and '\n' in left:
-        print()
-        print('--- Diff of left and right assert components ---')
+        hammett.print()
+        hammett.print('--- Diff of left and right assert components ---')
         left_lines = left.split('\n')
         right_lines = right.split('\n')
         from difflib import unified_diff
@@ -316,7 +316,7 @@ def analyze_assert(tb):
                     '-': colorama.Fore.RED,
                     '@': colorama.Fore.MAGENTA,
                 }.get(l[0], '')
-            print(f'{color}{l}{colorama.Style.RESET_ALL}')
+            hammett.print(f'{color}{l}{colorama.Style.RESET_ALL}')
 
 
 def inc_skipped():

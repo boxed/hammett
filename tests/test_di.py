@@ -1,7 +1,10 @@
 import unittest
 
 from hammett import Request
-from hammett.impl import dependency_injection_and_execute
+from hammett.impl import (
+    dependency_injection_and_execute,
+    FixturesUnresolvableException,
+)
 
 
 class DITests(unittest.TestCase):
@@ -38,3 +41,17 @@ class DITests(unittest.TestCase):
         request = Request(scope='function', parent=None)
 
         assert dependency_injection_and_execute(lambda foo: foo, fixtures, {}, request=request) == 3
+
+    def test_di_unresolvable(self):
+        fixtures = dict(
+            a=lambda b: b,
+        )
+        request = Request(scope='function', parent=None)
+
+        try:
+            dependency_injection_and_execute(lambda a: a, fixtures, {}, request=request)
+            assert False, 'Did not raise'
+        except FixturesUnresolvableException as e:
+            assert str(e) == '''Could not resolve fixtures any more, have {'a': {'b'}} left.
+Available dependencies: dict_keys([])'''
+
