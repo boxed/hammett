@@ -244,6 +244,28 @@ def pretty_format(x, _indent=0):
         return repr(x)
 
 
+def feedback_for_exception():
+    type, value, tb = sys.exc_info()
+    while tb.tb_next:
+        tb = tb.tb_next
+
+    local_variables = tb.tb_frame.f_locals
+    if local_variables:
+        hammett.print('--- Local variables ---')
+        for k, v in local_variables.items():
+            hammett.print(f'{k}:')
+            try:
+                hammett.print(indent(pretty_format(v)))
+            except Exception as e:
+                hammett.print(f'   Error getting local variable repr: {e}')
+
+    if type == AssertionError:
+        analyze_assert(tb)
+
+
+DIFF_STRING_SIZE_CUTOFF = 100
+
+
 def analyze_assert(tb):
     if hammett.g.disable_assert_analyze:
         return
@@ -301,7 +323,7 @@ def analyze_assert(tb):
         return
     hammett.print('right:')
     hammett.print(indent(pretty_format(right)))
-    if isinstance(left, str) and isinstance(right, str) and len(left) > 200 and len(right) > 200 and '\n' in left:
+    if isinstance(left, str) and isinstance(right, str) and len(left) > DIFF_STRING_SIZE_CUTOFF and len(right) > DIFF_STRING_SIZE_CUTOFF and '\n' in left:
         hammett.print()
         hammett.print('--- Diff of left and right assert components ---')
         left_lines = left.split('\n')
@@ -415,23 +437,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print(colorama.Style.RESET_ALL)
 
         if not hammett.g.quiet:
-            import traceback
-            type, value, tb = sys.exc_info()
-            while tb.tb_next:
-                tb = tb.tb_next
-
-            local_variables = tb.tb_frame.f_locals
-            if local_variables:
-                hammett.print('--- Local variables ---')
-                for k, v in local_variables.items():
-                    hammett.print(f'{k}:')
-                    try:
-                        hammett.print(indent(pretty_format(v)))
-                    except Exception as e:
-                        hammett.print(f'   Error getting local variable repr: {e}')
-
-            if type == AssertionError:
-                analyze_assert(tb)
+            feedback_for_exception()
 
         if hammett.g.drop_into_debugger:
             try:

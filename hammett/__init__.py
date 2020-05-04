@@ -35,15 +35,23 @@ class Globals:
     def reset(self):
         self.__init__()
 
+    def get_log_without_colors(self):
+        import re
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        return ansi_escape.sub('', ''.join([
+            str(args) + end
+            for args, end, flush in self.output
+        ]))
+
 
 g = Globals()
 
 
-def print(*args, end='\n', flush=False):
-    g.output.append((args, end, flush))
+def print(arg='', end='\n', flush=False):
+    g.output.append((arg, end, flush))
     if g.quiet:
         return
-    _orig_print(*args, end=end, flush=flush, file=sys.__stdout__)
+    _orig_print(arg, end=end, flush=flush, file=sys.__stdout__)
 
 
 def fixture(*args, **kwargs):
