@@ -454,7 +454,8 @@ def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
         return run_test(_name, _f, _module_request=_module_request, **kwargs)
 
     names, param_list = _stack[0]
-    names = [x.strip() for x in names.split(',')]
+    if isinstance(names, str):
+        names = [x.strip() for x in names.split(',')]
     for params in param_list:
         if not isinstance(params, (list, tuple)):
             params = [params]
