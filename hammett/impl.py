@@ -2,6 +2,7 @@ import os
 import sys
 from unittest import SkipTest
 import colorama
+from datetime import datetime
 
 import hammett
 
@@ -88,13 +89,18 @@ class FixturesUnresolvableException(Exception):
     pass
 
 
+_params_of_cache = {}
+
+
 def params_of(f):
-    import inspect
-    return set(
-        x.name
-        for x in inspect.signature(f).parameters.values()
-        if x.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    )
+    if f not in _params_of_cache:
+        import inspect
+        _params_of_cache[f] = set(
+            x.name
+            for x in inspect.signature(f).parameters.values()
+            if x.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        )
+    return _params_of_cache[f]
 
 
 def _teardown_yield_fixture(fixturefunc, it):
@@ -198,12 +204,13 @@ def should_stop():
 
 
 def should_skip(_f):
-    if not hasattr(_f, 'hammett_markers'):
-        return False
 
-    for marker in _f.hammett_markers:
-        if marker.name == 'skip':
-            return True
+    try:
+        for marker in _f.hammett_markers:
+            if marker.name == 'skip':
+                return True
+    except AttributeError:
+        pass
 
     return False
 
@@ -341,19 +348,25 @@ def analyze_assert(tb):
             hammett.print(f'{color}{l}{colorama.Style.RESET_ALL}')
 
 
+VERBOSE_SKIPPED = f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}'
+SKIPPED = f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}'
+VERBOSE_SUCCESS = f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}'
+SUCCESS = f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}'
+
+
 def inc_skipped():
     if hammett.g.verbose:
-        hammett.print(f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}')
+        hammett.print(VERBOSE_SKIPPED)
     else:
-        hammett.print(f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}', end='', flush=True)
+        hammett.print(SKIPPED, end='', flush=True)
     hammett.g.results['skipped'] += 1
 
 
 def inc_success(duration):
     if hammett.g.verbose:
-        hammett.print(f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}{duration}')
+        hammett.print(VERBOSE_SUCCESS + str(duration))
     else:
-        hammett.print(f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}', end='', flush=True)
+        hammett.print(SUCCESS, end='', flush=True)
     hammett.g.results['success'] += 1
 
 
@@ -383,13 +396,14 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stdout = hijacked_stdout
         sys.stderr = hijacked_stderr
 
-        from datetime import datetime
-        start = datetime.now()
+        if hammett.g.durations:
+            start = datetime.now()
 
         resolved_function, resolved_kwargs = dependency_injection(_f, fixtures, kwargs, request=req)
 
-        setup_time = datetime.now() - start
-        start = datetime.now()
+        if hammett.g.durations:
+            setup_time = datetime.now() - start
+            start = datetime.now()
 
         resolved_function(**resolved_kwargs)
 

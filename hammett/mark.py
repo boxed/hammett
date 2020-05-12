@@ -1,8 +1,10 @@
 def parametrize(argnames, argvalues, indirect=False, ids=None, scope=None):
     def parametrize_wrapper(f):
-        if not hasattr(f, 'hammett_parametrize_stack'):
+        try:
+            f.hammett_parametrize_stack.append((argnames, argvalues))
+        except AttributeError:
             f.hammett_parametrize_stack = []
-        f.hammett_parametrize_stack.append((argnames, argvalues))
+            f.hammett_parametrize_stack.append((argnames, argvalues))
         return f
 
     return parametrize_wrapper
@@ -27,9 +29,11 @@ def __getattr__(name: str):
             args = list(args)
 
             def decorate(f):
-                if not hasattr(f, 'hammett_markers'):
+                try:
+                    f.hammett_markers.append(Marker(name, args, kwargs))
+                except AttributeError:
                     f.hammett_markers = []
-                f.hammett_markers.append(Marker(name, args, kwargs))
+                    f.hammett_markers.append(Marker(name, args, kwargs))
                 return f
 
             if len(args) == 1:

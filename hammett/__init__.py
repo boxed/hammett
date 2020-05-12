@@ -88,6 +88,19 @@ def fail(message):
     raise RuntimeError(message)
 
 
+class Option:
+    def __init__(self):
+        self.verbose = g.verbose
+
+
+class Config:
+    def __init__(self):
+        self.option = Option()
+
+    def getvalue(self, _):
+        return None
+
+
 class Request:
     current_fixture_setup = None
 
@@ -101,17 +114,6 @@ class Request:
         self.finalizers = []
         self.fixture_results = {}
         self.funcargnames = []
-
-        class Option:
-            def __init__(self):
-                self.verbose = g.verbose
-
-        class Config:
-            def __init__(self):
-                self.option = Option()
-
-            def getvalue(self, _):
-                return None
 
         self.config = Config()
 
