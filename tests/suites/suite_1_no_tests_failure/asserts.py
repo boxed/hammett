@@ -1,1 +1,1 @@
-assert exit_code == 1
+assert exit_code == 3
