@@ -1,8 +1,10 @@
 import sys
 import os
+from os import listdir
 from os.path import (
     abspath,
     exists,
+    isdir,
     join,
 )
 
@@ -182,6 +184,32 @@ def parse_markers(markers):
     return dict(parse_one(m.strip()) for m in markers)
 
 
+def guess_modules_and_source_path():
+    this_dir = os.getcwd().split(os.sep)[-1]
+    if isdir('lib'):
+        return listdir('lib'), 'lib'
+    elif isdir('src'):
+        return listdir('src'), 'src'
+
+    if isdir(this_dir):
+        return [this_dir], '.'
+    elif isdir(this_dir.replace('-', '_')):
+        return [this_dir.replace('-', '_')], '.'
+    elif isdir(this_dir.replace(' ', '_')):
+        return [this_dir.replace(' ', '_')], '.'
+    elif isdir(this_dir.replace('-', '')):
+        return [this_dir.replace('-', '')], '.'
+    elif isdir(this_dir.replace(' ', '')):
+        return [this_dir.replace(' ', '')], '.'
+    raise FileNotFoundError('''Could not figure out the module names and where the code is. Please add a `modules` and `source_location` item under [hammett] in setup.cfg  like: 
+[hammett]
+modules=
+    foo
+    bar
+source_location=.
+''')
+
+
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
     import sys
     if sys.version_info[:2] < (3, 7):
@@ -215,23 +243,31 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     g.durations = durations
     g.disable_assert_analyze = disable_assert_analyze
 
+    from hammett.impl import read_settings, load_plugins
+    read_settings()
+
+    g.source_location = g.settings.get('source_location', '.')
+    g.modules = g.settings.get('modules')
+    if g.modules is None:
+        m, s = guess_modules_and_source_path()
+        g.source_location = g.source_location or s
+        g.modules = m
+
     def handle_dir(result, d):
         for root, dirs, files in os.walk(d):
             files = [
                 f for f in files
-                if f.startswith('test_') and f.endswith('.py')
+                if f.endswith('__tests.py') or (f.startswith('test_') and f.endswith('.py'))
             ]
             result.extend(join(root, x) for x in files)
 
     if filenames is None:
-        if not exists('tests') and not exists('test'):
-            print('No tests found')
-            return 1
-
         filenames = []
 
         handle_dir(filenames, 'tests/')
         handle_dir(filenames, 'test/')
+        for module_name in g.modules:
+            handle_dir(filenames, join(g.source_location, module_name))
     else:
         orig_filenames = filenames
         filenames = []
@@ -242,8 +278,11 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
             else:
                 filenames.append(filename)
 
-    from hammett.impl import read_settings
-    read_settings()
+    if not filenames:
+        print('No tests found.')
+
+
+    load_plugins()
     from os.path import split, sep
 
     session_request = Request(scope='session', parent=None)
@@ -253,6 +292,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
         import importlib.util
         import sys
+        if dirname.startswith('./'):
+            dirname = dirname[2:]
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
         if module_name in sys.modules:
             del sys.modules[module_name]

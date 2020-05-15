@@ -563,7 +563,8 @@ def read_settings():
     except NoSectionError:
         return
 
-    # load plugins
+
+def load_plugins():
     if 'plugins' not in hammett.g.settings:
         return
 
