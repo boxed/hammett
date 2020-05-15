@@ -238,6 +238,30 @@ def collect_files(filenames):
     return result
 
 
+def collect_file_data(path):
+    data = {}
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [x for x in dirs if not x.startswith('.') and x not in ['venv', 'env', '__pycache__']]
+        for filename in files:
+            if not filename.endswith('.py'):
+                continue
+            full_path = join(root, filename)
+            data[full_path] = os.stat(full_path).st_mtime_ns
+    return data
+
+
+def write_results(results):
+    """
+    The results database is a simple pickled dict with some keys:
+
+    db_version: the version so we can change the format and throw away an old db if needed
+    test_results: dict from test_module.test_name -> dict(output=str status=str)
+    file_data: dict filename -> nanosecond modification date
+    """
+
+    results['db_version'] = 1
+
+
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
     import sys
     if sys.version_info[:2] < (3, 7):
