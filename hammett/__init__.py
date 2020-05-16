@@ -215,6 +215,7 @@ def handle_dir(result, d):
         result.extend(join(root, x) for x in files)
 
 
+# TODO: merge collect_files and collect_file_data?
 def collect_files(filenames):
     result = []
     if filenames is None:
@@ -250,16 +251,68 @@ def collect_file_data(path):
     return data
 
 
-def write_results(results):
+DB_VERSION = 1
+DB_FILENAME = '.hammett-db'
+
+
+def write_result_db(results):
     """
     The results database is a simple pickled dict with some keys:
 
     db_version: the version so we can change the format and throw away an old db if needed
-    test_results: dict from test_module.test_name -> dict(output=str status=str)
+    test_results: dict from test_file -> (dict from test_name -> dict(output=str status=str))
     file_data: dict filename -> nanosecond modification date
     """
 
-    results['db_version'] = 1
+    results['db_version'] = DB_VERSION
+    from pickle import dump
+    with open(DB_FILENAME, 'wb') as f:
+        dump(results, f)
+
+
+def new_result_db():
+    return dict(
+        db_version=DB_VERSION,
+        test_results={},
+        file_data=None,
+    )
+
+
+def read_result_db():
+    from pickle import load
+    try:
+        with open(DB_FILENAME, 'rb') as f:
+            results = load(f)
+            if results['db_version'] != DB_VERSION:
+                raise FileNotFoundError()
+    except FileNotFoundError:
+        return new_result_db()
+    return results
+
+
+def update_result_db(results, new_file_data):
+    if results['file_data'] is None:
+        results['file_data'] = new_file_data
+        assert not results['test_results']
+        return results
+
+    # Clear out test results when the test file or the tested module has changed
+    old_file_data = new_file_data
+    for filename, modification_time in old_file_data.items():
+        if filename in new_file_data and modification_time != new_file_data[filename]:
+            if not filename.endswith('__tests.py'):
+                # The test has moved
+                pass
+            else:
+                # The module has moved so translate the filename to the test file
+                # TODO: this doesn't clear the db if the test file is in tests/ instead of next to the module
+                # TODO: this doesn't clear the db for module__function__tests.py
+                filename = filename[:-(len('.py'))] + '__tests.py'
+
+            try:
+                del results['test_results'][filename]
+            except KeyError:
+                pass
 
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
@@ -304,6 +357,10 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         m, s = guess_modules_and_source_path()
         g.source_location = g.source_location or s
         g.modules = m
+
+    result_db = read_result_db()
+    update_result_db(result_db, collect_file_data(g.source_location))
+    write_result_db(result_db)
 
     filenames = collect_files(filenames)
     if not filenames:
