@@ -411,6 +411,8 @@ source_location=.
 
         from hammett.impl import execute_test_function
         for name, f in list(module.__dict__.items()):
+            if g.results['abort']:
+                break
             if name.startswith('test_') and callable(f):
                 for m in module_markers:
                     f = m(f)
