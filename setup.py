@@ -93,4 +93,8 @@ setup(
     ],
     cmdclass={'tag': Tag,
               'release_check': ReleaseCheck},
+
+    entry_points={
+        'console_scripts': ["hammett = hammett:main_cli"],
+    },
 )
