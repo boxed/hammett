@@ -6,6 +6,7 @@ from os.path import (
     abspath,
     isdir,
     join,
+    split,
 )
 
 import hammett.mark as mark
@@ -223,7 +224,6 @@ def handle_dir(result, d):
         result.extend(join(root, x) for x in files)
 
 
-# TODO: merge collect_files and collect_file_data?
 def collect_files(filenames):
     result = []
     if filenames is None:
@@ -299,6 +299,13 @@ def read_result_db():
     return results
 
 
+def drop_cache_for_filename(result_db, filename):
+    try:
+        del result_db['test_results'][filename]
+    except KeyError:
+        pass
+
+
 def update_result_db(result_db, new_file_data):
     if result_db['file_data'] is None:
         result_db['file_data'] = new_file_data
@@ -309,19 +316,16 @@ def update_result_db(result_db, new_file_data):
     old_file_data = result_db['file_data']
     for filename, modification_time in old_file_data.items():
         if filename in new_file_data and modification_time != new_file_data[filename]:
-            if filename.endswith('__tests.py'):
+            if filename.endswith('__tests.py') or filename.startswith('test_'):
                 # The test has been changed
-                pass
+                drop_cache_for_filename(result_db, filename)
             else:
-                # The module has been changed so translate the filename to the test file
-                # TODO: this doesn't clear the db if the test file is in tests/ instead of next to the module
+                # The module has been changed so translate the filename to the possible test files
+                drop_cache_for_filename(result_db, filename[:-(len('.py'))] + '__tests.py')
+                _, filename_only = split(filename)
+                drop_cache_for_filename(result_db, f"tests/{filename[:-(len('.py'))]}" + '__tests.py')
                 # TODO: this doesn't clear the db for module__function__tests.py
-                filename = filename[:-(len('.py'))] + '__tests.py'
 
-            try:
-                del result_db['test_results'][filename]
-            except KeyError:
-                pass
     result_db['file_data'] = new_file_data
 
 
