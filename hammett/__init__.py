@@ -273,7 +273,6 @@ def write_result_db(results):
     test_results: dict from filename -> (dict from test_name -> dict(stdout=str, stderr=str, status=str))
     file_data: dict filename -> nanosecond modification date
     """
-
     results['db_version'] = DB_VERSION
     from pickle import dump
     with open(DB_FILENAME, 'wb') as f:
@@ -300,29 +299,30 @@ def read_result_db():
     return results
 
 
-def update_result_db(results, new_file_data):
-    if results['file_data'] is None:
-        results['file_data'] = new_file_data
-        assert not results['test_results']
-        return results
+def update_result_db(result_db, new_file_data):
+    if result_db['file_data'] is None:
+        result_db['file_data'] = new_file_data
+        assert not result_db['test_results']
+        return result_db
 
     # Clear out test results when the test file or the tested module has changed
-    old_file_data = new_file_data
+    old_file_data = result_db['file_data']
     for filename, modification_time in old_file_data.items():
         if filename in new_file_data and modification_time != new_file_data[filename]:
-            if not filename.endswith('__tests.py'):
-                # The test has moved
+            if filename.endswith('__tests.py'):
+                # The test has been changed
                 pass
             else:
-                # The module has moved so translate the filename to the test file
+                # The module has been changed so translate the filename to the test file
                 # TODO: this doesn't clear the db if the test file is in tests/ instead of next to the module
                 # TODO: this doesn't clear the db for module__function__tests.py
                 filename = filename[:-(len('.py'))] + '__tests.py'
 
             try:
-                del results['test_results'][filename]
+                del result_db['test_results'][filename]
             except KeyError:
                 pass
+    result_db['file_data'] = new_file_data
 
 
 def finish():
