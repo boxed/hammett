@@ -13,6 +13,12 @@ import hammett.mark as mark
 
 __version__ = '0.6.0'
 
+from hammett.colors import (
+    YELLOW,
+    RED,
+    RESET_COLOR,
+    GREEN,
+)
 
 MISSING = object()
 
@@ -397,13 +403,13 @@ source_location=.
         import sys
         if dirname.startswith('./'):
             dirname = dirname[2:]
-        filename = join(dirname, filename)
 
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
         if module_name in sys.modules:
             del sys.modules[module_name]
 
-        if filename in g.result_db['test_results']:
+        cache_filename = join(dirname, filename)
+        if cache_filename in g.result_db['test_results']:
             continue
 
         # We do this here because if all test results are up to date, we want to avoid loading slow plugins!
@@ -476,12 +482,11 @@ source_location=.
 
     finish()
 
-    import colorama
-    color = colorama.Fore.GREEN
+    color = GREEN
     if g.results['skipped']:
-        color = colorama.Fore.YELLOW
+        color = YELLOW
     if g.results['failed']:
-        color = colorama.Fore.RED
+        color = RED
 
     if clean_up_sys_path:
         del sys.path[0]
@@ -503,7 +508,7 @@ source_location=.
 
         print()
 
-    print(f'{color}{g.results["success"]} succeeded, {g.results["failed"]} failed, {g.results["skipped"]} skipped{colorama.Style.RESET_ALL}')
+    print(f'{color}{g.results["success"]} succeeded, {g.results["failed"]} failed, {g.results["skipped"]} skipped{RESET_COLOR}')
     os.chdir(g.orig_cwd)
 
     if g.results['abort']:

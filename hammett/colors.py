@@ -1,0 +1,5 @@
+YELLOW = '\x1b[33m'
+GREEN = '\x1b[32m'
+RED = '\x1b[31m'
+MAGENTA = '\x1b[35m'
+RESET_COLOR = '\x1b[0m'

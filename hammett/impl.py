@@ -1,10 +1,16 @@
 import os
 import sys
 from unittest import SkipTest
-import colorama
 from datetime import datetime
 
 import hammett
+from hammett.colors import (
+    GREEN,
+    RED,
+    YELLOW,
+    MAGENTA,
+    RESET_COLOR,
+)
 
 
 class RaisesContext(object):
@@ -336,16 +342,15 @@ def analyze_assert(tb):
         left_lines = left.split('\n')
         right_lines = right.split('\n')
         from difflib import unified_diff
-        import colorama
         for l in unified_diff(left_lines, right_lines, lineterm=''):
             color = ''
             if l:
                 color = {
-                    '+': colorama.Fore.GREEN,
-                    '-': colorama.Fore.RED,
-                    '@': colorama.Fore.MAGENTA,
+                    '+': GREEN,
+                    '-': RED,
+                    '@': MAGENTA,
                 }.get(l[0], '')
-            hammett.print(f'{color}{l}{colorama.Style.RESET_ALL}')
+            hammett.print(f'{color}{l}{RESET_COLOR}')
 
 
 SKIPPED = 'skipped'
@@ -355,18 +360,22 @@ FAILED = 'failed'
 
 MESSAGES = {
     SKIPPED: dict(
-        v=f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}',
-        s=f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}',
+        v=f' {YELLOW}Skipped{RESET_COLOR}',
+        s=f'{YELLOW}s{RESET_COLOR}',
     ),
     SUCCESS: dict(
-        v=f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}',
-        s=f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}',
+        v=f' {GREEN}Success{RESET_COLOR}',
+        s=f'{GREEN}.{RESET_COLOR}',
+    ),
+    FAILED: dict(
+        v=f' {RED}Failed{RESET_COLOR}',
+        s=f'{RED}F{RESET_COLOR}',
     ),
 }
-MSG_SKIPPED_VERBOSE = f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}'
-MSG_SKIPPED = f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}'
-MSG_SUCCESS_VERBOSE = f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}'
-MSG_SUCCESS = f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}'
+MSG_SKIPPED_VERBOSE = f' {YELLOW}Skipped{RESET_COLOR}'
+MSG_SKIPPED = f'{YELLOW}s{RESET_COLOR}'
+MSG_SUCCESS_VERBOSE = f' {GREEN}Success{RESET_COLOR}'
+MSG_SUCCESS = f'{GREEN}.{RESET_COLOR}'
 
 
 def inc_test_result(status, _name, _f, duration, stdout, stderr):
@@ -452,7 +461,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
 
-        hammett.print(colorama.Fore.RED)
+        hammett.print(RED)
         if not hammett.g.verbose:
             hammett.print()
         hammett.print('Failed:', _name)
@@ -463,16 +472,16 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         hammett.print()
         if hijacked_stdout.getvalue():
-            hammett.print(colorama.Fore.YELLOW)
+            hammett.print(YELLOW)
             hammett.print('--- stdout ---')
             hammett.print(hijacked_stdout.getvalue())
 
         if hijacked_stderr.getvalue():
-            hammett.print(colorama.Fore.RED)
+            hammett.print(RED)
             hammett.print('--- stderr ---')
             hammett.print(hijacked_stderr.getvalue())
 
-        hammett.print(colorama.Style.RESET_ALL)
+        hammett.print(RESET_COLOR)
 
         if not hammett.g.quiet:
             feedback_for_exception()
