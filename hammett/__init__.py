@@ -1,9 +1,9 @@
 import sys
 import os
+from collections import defaultdict
 from os import listdir
 from os.path import (
     abspath,
-    exists,
     isdir,
     join,
 )
@@ -35,6 +35,7 @@ class Globals:
         self.durations_results = []
         self.disable_assert_analyze = False
         self.output = []
+        self.result_db = None
         
     def reset(self):
         self.__init__()
@@ -247,6 +248,8 @@ def collect_file_data(path):
             if not filename.endswith('.py'):
                 continue
             full_path = join(root, filename)
+            assert full_path.startswith('./')
+            full_path = full_path[2:]
             data[full_path] = os.stat(full_path).st_mtime_ns
     return data
 
@@ -260,7 +263,7 @@ def write_result_db(results):
     The results database is a simple pickled dict with some keys:
 
     db_version: the version so we can change the format and throw away an old db if needed
-    test_results: dict from test_file -> (dict from test_name -> dict(output=str status=str))
+    test_results: dict from filename -> (dict from test_name -> dict(stdout=str, stderr=str, status=str))
     file_data: dict filename -> nanosecond modification date
     """
 
@@ -273,7 +276,7 @@ def write_result_db(results):
 def new_result_db():
     return dict(
         db_version=DB_VERSION,
-        test_results={},
+        test_results=defaultdict(dict),
         file_data=None,
     )
 
@@ -358,9 +361,9 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         g.source_location = g.source_location or s
         g.modules = m
 
-    result_db = read_result_db()
-    update_result_db(result_db, collect_file_data(g.source_location))
-    write_result_db(result_db)
+    g.result_db = read_result_db()
+    update_result_db(g.result_db, collect_file_data(g.source_location))
+    write_result_db(g.result_db)
 
     filenames = collect_files(filenames)
     if not filenames:
@@ -484,8 +487,10 @@ source_location=.
     os.chdir(g.orig_cwd)
 
     if g.results['abort']:
+        write_result_db(g.result_db)
         return 2
 
+    write_result_db(g.result_db)
     return 1 if g.results['failed'] else 0
 
 

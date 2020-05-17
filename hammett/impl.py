@@ -348,31 +348,42 @@ def analyze_assert(tb):
             hammett.print(f'{color}{l}{colorama.Style.RESET_ALL}')
 
 
-VERBOSE_SKIPPED = f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}'
-SKIPPED = f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}'
-VERBOSE_SUCCESS = f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}'
-SUCCESS = f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}'
+SKIPPED = 'skipped'
+SUCCESS = 'success'
+FAILED = 'failed'
 
 
-def inc_skipped():
-    if hammett.g.verbose:
-        hammett.print(VERBOSE_SKIPPED)
+MESSAGES = {
+    SKIPPED: dict(
+        v=f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}',
+        s=f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}',
+    ),
+    SUCCESS: dict(
+        v=f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}',
+        s=f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}',
+    ),
+}
+MSG_SKIPPED_VERBOSE = f' {colorama.Fore.YELLOW}Skipped{colorama.Style.RESET_ALL}'
+MSG_SKIPPED = f'{colorama.Fore.YELLOW}s{colorama.Style.RESET_ALL}'
+MSG_SUCCESS_VERBOSE = f' {colorama.Fore.GREEN}Success{colorama.Style.RESET_ALL}'
+MSG_SUCCESS = f'{colorama.Fore.GREEN}.{colorama.Style.RESET_ALL}'
+
+
+def inc_test_result(status, _name, _f, duration, stdout, stderr):
+    verbose = hammett.g.verbose
+    message = MESSAGES[status]['v' if verbose else 's']
+    if verbose:
+        hammett.print(message + (str(duration) if duration else ''))
     else:
-        hammett.print(SKIPPED, end='', flush=True)
-    hammett.g.results['skipped'] += 1
-
-
-def inc_success(duration):
-    if hammett.g.verbose:
-        hammett.print(VERBOSE_SUCCESS + str(duration))
-    else:
-        hammett.print(SUCCESS, end='', flush=True)
-    hammett.g.results['success'] += 1
+        hammett.print(message, end='', flush=True)
+    hammett.g.results[status] += 1
+    filename = _f.__module__.replace('.', os.sep) + '.py'
+    hammett.g.result_db['test_results'][filename][_name] = dict(stdout=stdout, stderr=stderr, status=status)
 
 
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        inc_skipped()
+        inc_test_result(SKIPPED, _name, _f, stdout='', stderr='')
         return
 
     from io import StringIO
@@ -389,6 +400,11 @@ def run_test(_name, _f, _module_request, **kwargs):
     hijacked_stderr = StringIO()
     prev_stdout = sys.stdout
     prev_stderr = sys.stderr
+
+    status = None
+    duration = None
+    start = None
+    setup_time = None
 
     if hammett.g.verbose:
         hammett.print(_name + '...', end='', flush=True)
@@ -407,14 +423,13 @@ def run_test(_name, _f, _module_request, **kwargs):
 
         resolved_function(**resolved_kwargs)
 
-        duration = ''
         if hammett.g.durations:
-            hammett.g.durations_results.append((_name, datetime.now() - start, setup_time))
+            duration = datetime.now() - start
+            hammett.g.durations_results.append((_name, duration, setup_time))
 
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
-
-        inc_success(duration)
+        status = SUCCESS
     except KeyboardInterrupt:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -423,7 +438,10 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print('ABORTED')
         hammett.g.results['abort'] += 1
     except SkipTest:
-        inc_skipped()
+        sys.stdout = prev_stdout
+        sys.stderr = prev_stderr
+
+        status = SKIPPED
     except:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -460,7 +478,10 @@ def run_test(_name, _f, _module_request, **kwargs):
                 import pdb
             pdb.set_trace()
 
-        hammett.g.results['failed'] += 1
+        status = FAILED
+
+    assert status is not None
+    inc_test_result(status, _name, _f, duration, stdout=hijacked_stdout.getvalue(), stderr=hijacked_stderr.getvalue())
 
     # Tests can change this which breaks everything. Reset!
     os.chdir(hammett.g.orig_cwd)
