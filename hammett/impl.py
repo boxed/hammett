@@ -200,7 +200,7 @@ def dependency_injection_and_execute(f, fixtures, orig_kwargs, request):
 
 
 def should_stop():
-    return hammett.g.fail_fast and (hammett.g.results['failed'] or hammett.g.results['abort'])
+    return hammett.g.should_stop
 
 
 def should_skip(_f):
@@ -376,8 +376,13 @@ def inc_test_result(status, _name, _f, duration, stdout, stderr):
         hammett.print(message + (str(duration) if duration else ''))
     else:
         hammett.print(message, end='', flush=True)
-    hammett.g.results[status] += 1
+
+    if hammett.g.fail_fast and status not in ('success', 'skipped'):
+        hammett.g.should_stop = True
+
     filename = _f.__module__.replace('.', os.sep) + '.py'
+    assert _name.startswith(_f.__module__)
+    _name = _name[len(_f.__module__) + 1:]
     hammett.g.result_db['test_results'][filename][_name] = dict(stdout=stdout, stderr=stderr, status=status)
 
 
@@ -437,6 +442,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print()
         hammett.print('ABORTED')
         hammett.g.results['abort'] += 1
+        hammett.g.should_stop = True
     except SkipTest:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -564,6 +570,7 @@ def load_plugin(module_name):
         import traceback
         hammett.print(traceback.format_exc())
         hammett.g.results['abort'] += 1
+        hammett.g.should_stop = True
         return
     try:
         importlib.import_module(module_name + '.fixtures')

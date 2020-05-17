@@ -36,6 +36,7 @@ class Globals:
         self.disable_assert_analyze = False
         self.output = []
         self.result_db = None
+        self.should_stop = False
         
     def reset(self):
         self.__init__()
@@ -318,6 +319,12 @@ def update_result_db(results, new_file_data):
                 pass
 
 
+def finish():
+    for x in g.result_db['test_results'].values():
+        for y in x.values():
+            g.results[y['status']] += 1
+
+
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
     import sys
     if sys.version_info[:2] < (3, 7):
@@ -378,7 +385,7 @@ source_location=.
 ''')
         return 3
 
-    load_plugins()
+    plugins_loaded = False
     from os.path import split, sep
 
     session_request = Request(scope='session', parent=None)
@@ -390,9 +397,19 @@ source_location=.
         import sys
         if dirname.startswith('./'):
             dirname = dirname[2:]
+        filename = join(dirname, filename)
+
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
         if module_name in sys.modules:
             del sys.modules[module_name]
+
+        if filename in g.result_db['test_results']:
+            continue
+
+        # We do this here because if all test results are up to date, we want to avoid loading slow plugins!
+        if not plugins_loaded:
+            load_plugins()
+            plugins_loaded = True
 
         spec = importlib.util.spec_from_file_location(module_name, test_filename)
         module = importlib.util.module_from_spec(spec)
@@ -456,6 +473,9 @@ source_location=.
 
     if not g.verbose:
         print()
+
+    finish()
+
     import colorama
     color = colorama.Fore.GREEN
     if g.results['skipped']:
