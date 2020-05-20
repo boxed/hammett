@@ -314,6 +314,7 @@ def update_result_db(result_db, new_file_data):
 
     # Clear out test results when the test file or the tested module has changed
     old_file_data = result_db['file_data']
+    clear_all_non_module_tests = False
     for filename, modification_time in old_file_data.items():
         if filename in new_file_data and modification_time != new_file_data[filename]:
             if filename.endswith('__tests.py') or filename.startswith('test_'):
@@ -324,7 +325,14 @@ def update_result_db(result_db, new_file_data):
                 drop_cache_for_filename(result_db, filename[:-(len('.py'))] + '__tests.py')
                 _, filename_only = split(filename)
                 drop_cache_for_filename(result_db, f"tests/{filename[:-(len('.py'))]}" + '__tests.py')
+                clear_all_non_module_tests = True
                 # TODO: this doesn't clear the db for module__function__tests.py
+
+    if clear_all_non_module_tests:
+        from pathlib import Path
+        non_module_filenames = [x for x in result_db['test_results'].keys() if Path(x).stem.startswith('test_')]
+        for x in non_module_filenames:
+            del result_db['test_results'][x]
 
     result_db['file_data'] = new_file_data
 
