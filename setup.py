@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 import re
-from setuptools import setup, find_packages, Command
 from io import open
+from setuptools import Command, setup
 
 readme = open('README.rst', encoding='utf8').read()
 
