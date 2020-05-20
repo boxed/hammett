@@ -4,6 +4,9 @@ hammett
 .. image:: https://travis-ci.org/boxed/hammett.svg?branch=master
     :target: https://travis-ci.org/boxed/hammett
 
+.. image:: https://codecov.io/gh/boxed/hammett/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/boxed/hammett
+
 
 Hammett is a fast python test runner that aims to be compatible with the parts
 of pytest most people use (unless that conflicts with the goal of being fast).
