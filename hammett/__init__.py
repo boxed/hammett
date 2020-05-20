@@ -255,8 +255,8 @@ def collect_file_data(path):
             if not filename.endswith('.py'):
                 continue
             full_path = join(root, filename)
-            assert full_path.startswith('./')
-            full_path = full_path[2:]
+            if full_path.startswith('./') or full_path.startswith('.\''):
+                full_path = full_path[2:]
             data[full_path] = os.stat(full_path).st_mtime_ns
     return data
 
