@@ -269,7 +269,7 @@ def handle_dir(result, d):
     for root, dirs, files in os.walk(d):
         files = [
             f for f in files
-            if f.endswith('__tests.py') or (f.startswith('test_') and f.endswith('.py'))
+            if f.endswith('__tests.py') or (f.startswith('test_') and f.endswith('.py')) or f.endswith('_test.py')
         ]
         result.extend(join(root, x) for x in files)
 
