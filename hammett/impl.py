@@ -265,7 +265,7 @@ def feedback_for_exception():
     local_variables = tb.tb_frame.f_locals
     if local_variables:
         hammett.print('--- Local variables ---')
-        for k, v in local_variables.items():
+        for k, v in sorted(local_variables.items()):
             hammett.print(f'{k}:')
             try:
                 hammett.print(indent(pretty_format(v)))
@@ -397,7 +397,7 @@ def inc_test_result(status, _name, _f, duration, stdout, stderr):
 
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        inc_test_result(SKIPPED, _name, _f, stdout='', stderr='')
+        inc_test_result(SKIPPED, _name, _f, duration=0, stdout='', stderr='')
         return
 
     from io import StringIO

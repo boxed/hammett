@@ -11,7 +11,7 @@ from hammett import main, g
 class SuitesTests(unittest.TestCase):
     def test_suites(self):
         base = abspath('.')
-        suites_base = abspath('tests/suites')
+        suites_base = abspath(join('tests', 'suites'))
         for d in os.listdir(suites_base):
             p = os.path.join(suites_base, d)
             if not os.path.isdir(p):

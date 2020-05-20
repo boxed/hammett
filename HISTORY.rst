@@ -1,6 +1,14 @@
 Changelog
 ---------
 
+0.7.1 (2020-05-20)
+~~~~~~~~~~~~~~~~~~
+
+* Fixed pretty bad cache invalidation bug. You might need to delete your .hammett-db file.
+
+* Attempt to get windows support
+
+
 0.7.0 (2020-05-20)
 ~~~~~~~~~~~~~~~~~~
 

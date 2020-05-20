@@ -10,7 +10,7 @@ from os.path import (
 )
 
 
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 
 from hammett.colors import (
     YELLOW,
@@ -225,8 +225,8 @@ def handle_dir(result, d):
 def collect_files(filenames):
     result = []
     if filenames is None:
-        handle_dir(result, 'tests/')
-        handle_dir(result, 'test/')
+        handle_dir(result, f'tests{os.sep}')
+        handle_dir(result, f'test{os.sep}')
         for module_name in g.modules:
             handle_dir(result, join(g.source_location, module_name))
     else:
@@ -253,8 +253,8 @@ def collect_file_data(path):
             if not filename.endswith('.py'):
                 continue
             full_path = join(root, filename)
-            assert full_path.startswith('./')
-            full_path = full_path[2:]
+            if full_path.startswith(f'.{os.sep}'):
+                full_path = full_path[2:]
             data[full_path] = os.stat(full_path).st_mtime_ns
     return data
 
@@ -312,6 +312,7 @@ def update_result_db(result_db, new_file_data):
 
     # Clear out test results when the test file or the tested module has changed
     old_file_data = result_db['file_data']
+    clear_all_non_module_tests = False
     for filename, modification_time in old_file_data.items():
         if filename in new_file_data and modification_time != new_file_data[filename]:
             if filename.endswith('__tests.py') or filename.startswith('test_'):
@@ -321,8 +322,15 @@ def update_result_db(result_db, new_file_data):
                 # The module has been changed so translate the filename to the possible test files
                 drop_cache_for_filename(result_db, filename[:-(len('.py'))] + '__tests.py')
                 _, filename_only = split(filename)
-                drop_cache_for_filename(result_db, f"tests/{filename[:-(len('.py'))]}" + '__tests.py')
+                drop_cache_for_filename(result_db, f"tests{os.sep}{filename[:-(len('.py'))]}" + '__tests.py')
+                clear_all_non_module_tests = True
                 # TODO: this doesn't clear the db for module__function__tests.py
+
+    if clear_all_non_module_tests:
+        from pathlib import Path
+        non_module_filenames = [x for x in result_db['test_results'].keys() if Path(x).stem.startswith('test_')]
+        for x in non_module_filenames:
+            del result_db['test_results'][x]
 
     result_db['file_data'] = new_file_data
 
@@ -402,7 +410,7 @@ source_location=.
         dirname, filename = split(test_filename)
 
         import importlib.util
-        if dirname.startswith('./'):
+        if dirname.startswith(f'.{os.sep}'):
             dirname = dirname[2:]
 
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
