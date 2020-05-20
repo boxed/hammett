@@ -12,7 +12,7 @@ from os.path import (
 import hammett.mark as mark
 
 
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 
 from hammett.colors import (
     YELLOW,
