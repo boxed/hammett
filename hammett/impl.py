@@ -342,7 +342,7 @@ def analyze_assert(tb):
         left_lines = left.split('\n')
         right_lines = right.split('\n')
         from difflib import unified_diff
-        for line in unified_diff(left_lines, right_lines, lineterm=''):
+        for line in unified_diff(left_lines, right_lines, fromfile='expected', tofile='actual', lineterm=''):
             color = ''
             if line:
                 color = {

@@ -132,8 +132,8 @@ right:
     {sample_corrupt!r}
 
 --- Diff of left and right assert components ---
---- 
-+++ 
+--- expected
++++ actual
 @@ -6,7 +6,7 @@
          Fusce et sapien pretium, pretium nisl vel, sollicitudin augue.
          Donec sagittis orci nec fringilla auctor.
