@@ -227,8 +227,8 @@ def handle_dir(result, d):
 def collect_files(filenames):
     result = []
     if filenames is None:
-        handle_dir(result, 'tests/')
-        handle_dir(result, 'test/')
+        handle_dir(result, f'tests{os.sep}')
+        handle_dir(result, f'test{os.sep}')
         for module_name in g.modules:
             handle_dir(result, join(g.source_location, module_name))
     else:
@@ -255,7 +255,7 @@ def collect_file_data(path):
             if not filename.endswith('.py'):
                 continue
             full_path = join(root, filename)
-            if full_path.startswith('./') or full_path.startswith('.\''):
+            if full_path.startswith(f'.{os.sep}'):
                 full_path = full_path[2:]
             data[full_path] = os.stat(full_path).st_mtime_ns
     return data
@@ -324,7 +324,7 @@ def update_result_db(result_db, new_file_data):
                 # The module has been changed so translate the filename to the possible test files
                 drop_cache_for_filename(result_db, filename[:-(len('.py'))] + '__tests.py')
                 _, filename_only = split(filename)
-                drop_cache_for_filename(result_db, f"tests/{filename[:-(len('.py'))]}" + '__tests.py')
+                drop_cache_for_filename(result_db, f"tests{os.sep}{filename[:-(len('.py'))]}" + '__tests.py')
                 clear_all_non_module_tests = True
                 # TODO: this doesn't clear the db for module__function__tests.py
 
@@ -413,7 +413,7 @@ source_location=.
 
         import importlib.util
         import sys
-        if dirname.startswith('./'):
+        if dirname.startswith(f'.{os.sep}'):
             dirname = dirname[2:]
 
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
