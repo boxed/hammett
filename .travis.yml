@@ -20,10 +20,15 @@ jobs:
       script: make test
       dist: xenial
 
-#      - python: pypy3
-#        before_install: pip install tox
-#        script: make test
-#        dist: xenial
+    - python: "3.6"
+      before_install: pip install tox
+      script: make test
+      dist: xenial
+
+    - python: pypy3
+      before_install: pip install tox
+      script: make test
+      dist: xenial
 
 #    - stage: deploy
 #      script: python setup.py sdist
