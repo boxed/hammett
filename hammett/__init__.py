@@ -9,8 +9,6 @@ from os.path import (
     split,
 )
 
-import hammett.mark as mark
-
 
 __version__ = '0.7.0'
 
@@ -44,7 +42,7 @@ class Globals:
         self.output = []
         self.result_db = None
         self.should_stop = False
-        
+
     def reset(self):
         self.__init__()
 
@@ -359,7 +357,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     from hammett.impl import should_stop
     g.reset()
-    
+
     g.results = dict(success=0, failed=0, skipped=0, abort=0)
     g.verbose = verbose
     g.fail_fast = fail_fast
@@ -404,7 +402,6 @@ source_location=.
         dirname, filename = split(test_filename)
 
         import importlib.util
-        import sys
         if dirname.startswith('./'):
             dirname = dirname[2:]
 

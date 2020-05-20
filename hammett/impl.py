@@ -2,6 +2,7 @@ import os
 import sys
 from unittest import SkipTest
 from datetime import datetime
+from hammett import fixtures as built_in_fixtures
 
 import hammett
 from hammett.colors import (
@@ -77,7 +78,6 @@ def register_fixture(fixture, *args, autouse=False, scope='function'):
     fixtures[name] = fixture
 
 
-from hammett import fixtures as built_in_fixtures
 for fixture_name, fixture in built_in_fixtures.__dict__.items():
     if not fixture_name.startswith('_'):
         register_fixture(fixture)
@@ -292,7 +292,7 @@ def analyze_assert(tb):
             with open(os.path.join(hammett.g.orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
                 source = f.read().split('\n')
         except FileNotFoundError:
-            hammett.print(f'Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
+            hammett.print('Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
             return
 
     line_no = tb.tb_frame.f_lineno - 1
@@ -342,15 +342,15 @@ def analyze_assert(tb):
         left_lines = left.split('\n')
         right_lines = right.split('\n')
         from difflib import unified_diff
-        for l in unified_diff(left_lines, right_lines, lineterm=''):
+        for line in unified_diff(left_lines, right_lines, lineterm=''):
             color = ''
-            if l:
+            if line:
                 color = {
                     '+': GREEN,
                     '-': RED,
                     '@': MAGENTA,
-                }.get(l[0], '')
-            hammett.print(f'{color}{l}{RESET_COLOR}')
+                }.get(line[0], '')
+            hammett.print(f'{color}{line}{RESET_COLOR}')
 
 
 SKIPPED = 'skipped'

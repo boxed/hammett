@@ -54,4 +54,3 @@ class DITests(unittest.TestCase):
         except FixturesUnresolvableException as e:
             assert str(e) == '''Could not resolve fixtures any more, have {'a': {'b'}} left.
 Available dependencies: dict_keys([])'''
-
