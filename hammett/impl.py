@@ -512,6 +512,9 @@ def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
     names, param_list = _stack[0]
     if isinstance(names, str):
         names = [x.strip() for x in names.split(',')]
+    # if you have just one argument, we allow to just pass a list instead of a list of lists, which is a pytest compatibility feature
+    if len(names) == 1 and len(param_list) != 1:
+        param_list = [param_list]
     for params in param_list:
         if not isinstance(params, (list, tuple)):
             params = [params]
