@@ -337,8 +337,8 @@ def finish():
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
     import sys
-    if sys.version_info[:2] < (3, 7):
-        print('hammett requires python 3.7 or later')
+    if sys.version_info[:2] < (3, 6):
+        print('hammett requires python 3.6 or later')
         exit(999)
 
     sys.modules['pytest'] = sys.modules['hammett']
