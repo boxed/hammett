@@ -22,4 +22,10 @@ class SuitesTests(unittest.TestCase):
                 with open(join(p, 'asserts.py')) as f:
                     asserts = f.read()
 
-                exec(asserts, {'g': g, 'exit_code': exit_code, 'base': base})
+                try:
+                    exec(asserts, {'g': g, 'exit_code': exit_code, 'base': base})
+                except AssertionError:
+                    print('g', g)
+                    print('exit_code', exit_code)
+                    print('base', base)
+                    assert False
