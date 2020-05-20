@@ -9,8 +9,12 @@ stages:
 install:
   - pip install -r requirements.txt
   - pip install .
+  - pip install codecov
 
 script: python -m pytest
+
+after_success:
+  - codecov
 
 jobs:
   include:
