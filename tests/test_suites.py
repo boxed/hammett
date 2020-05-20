@@ -28,4 +28,5 @@ class SuitesTests(unittest.TestCase):
                     print('g.results', g.results)
                     print('exit_code', exit_code)
                     print('base', base)
+                    print('output', g.output)
                     assert False
