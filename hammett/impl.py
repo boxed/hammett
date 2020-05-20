@@ -397,7 +397,7 @@ def inc_test_result(status, _name, _f, duration, stdout, stderr):
 
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        inc_test_result(SKIPPED, _name, _f, stdout='', stderr='')
+        inc_test_result(SKIPPED, _name, _f, duration=0, stdout='', stderr='')
         return
 
     from io import StringIO
