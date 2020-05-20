@@ -32,7 +32,7 @@ Or iommi:
 But even if your test suite is big and slow you can still get some big
 improvements out of hammett if you often run just one file or one test:
 
-In iommi, running "-k test_render_attrs_none"
+In iommi, running `-k test_render_attrs_none`
 
 - pytest: ~1.3 s
 - hammett: ~0.6 s
@@ -105,6 +105,7 @@ test files, you can still keep compatibility with pytest by specifying the
 module of your project and the tests file pattern, like this:
 
 .. code::
+
     testpaths=
         tests
         my_project
