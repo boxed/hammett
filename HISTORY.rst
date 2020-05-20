@@ -1,6 +1,22 @@
 Changelog
 ---------
 
+0.7.0 (2020-05-20)
+~~~~~~~~~~~~~~~~~~
+
+* Added hammett specific tests files system. This means if you have a file `my_project/foo.py` hammett will look for `my_project/foo__tests.py` and `testt/foo__tests.py` for tests specific for that module.
+
+* If you have module specific tests (see previous point), you can now run tests for a module with `hammett my_project.foo`
+
+* Implemented a results cache. This means that if you haven't changed your source or tests hammett knows not to rerun the tests. If you have module specific tests it will run only the relevant tests for that module when you change the module.
+
+* Added `hammett` command line. Beware of using this after doing `setup.py develop` as setuptools then adds a huge overhead.
+
+* Support python 3.6
+
+* Optimizations
+
+
 0.6.0 (2020-05-04)
 ~~~~~~~~~~~~~~~~~~
 
