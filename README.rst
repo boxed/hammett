@@ -84,12 +84,6 @@ Some plugins work, but you have to specify to load them in setup.cfg:
         pytest_django
 
 
-Notable missing features
-------------------------
-
-* no support for class based tests
-
-
 Usage
 ------
 

@@ -390,7 +390,6 @@ def inc_test_result(status, _name, _f, duration, stdout, stderr):
         hammett.g.should_stop = True
 
     filename = _f.__module__.replace('.', os.sep) + '.py'
-    assert _name.startswith(_f.__module__)
     _name = _name[len(_f.__module__) + 1:]
     hammett.g.result_db['test_results'][filename][_name] = dict(stdout=stdout, stderr=stderr, status=status)
 
@@ -528,6 +527,19 @@ def execute_test_function(_name, _f, module_request):
         return execute_parametrize(_name, _f, _f.hammett_parametrize_stack, module_request)
     else:
         return run_test(_name, _f, module_request)
+
+
+def execute_test_class(_name, _c, module_request):
+    test_case = _c()
+    test_case.setUp()
+
+    for member_name in dir(test_case):
+        if member_name.startswith('test_'):
+            execute_test_function(f'{_name}.{member_name}', getattr(test_case, member_name), module_request)
+
+    test_case.tearDown()
+
+    # return run_test(_name, _f, module_request)
 
 
 class FakePytestParser:

@@ -496,35 +496,46 @@ source_location=.
         if not isinstance(module_markers, list):
             module_markers = [module_markers]
 
-        from hammett.impl import execute_test_function
+        from hammett.impl import execute_test_function, execute_test_class
+        from unittest import TestCase
         for name, f in list(module.__dict__.items()):
             if g.results['abort']:
                 break
-            if name.startswith('test_') and callable(f):
-                for m in module_markers:
-                    f = m(f)
 
-                if match is not None:
-                    if match not in name:
-                        continue
+            if match is not None:
+                if match not in name:
+                    continue
 
-                if markers is not None:
-                    keep = False
-                    for f_marker in getattr(f, 'hammett_markers', []):
-                        if f_marker.name in markers:
-                            arg = markers[f_marker.name]
-                            if arg is not None:
-                                assert len(f_marker.args) == 1, 'hammett only supports filtering on single arguments to markers right now'
-                                if str(f_marker.args[0]) == arg:
-                                    keep = True
-                                    break
-                            else:
+            for m in module_markers:
+                f = m(f)
+
+            is_test_function = name.startswith('test_') and callable(f)
+            is_test_class = isinstance(f, type) and issubclass(f, TestCase)
+
+            if not is_test_function and not is_test_class:
+                continue
+
+            if markers is not None:
+                keep = False
+                for f_marker in getattr(f, 'hammett_markers', []):
+                    if f_marker.name in markers:
+                        arg = markers[f_marker.name]
+                        if arg is not None:
+                            assert len(f_marker.args) == 1, 'hammett only supports filtering on single arguments to markers right now'
+                            if str(f_marker.args[0]) == arg:
                                 keep = True
                                 break
-                    if not keep:
-                        continue
+                        else:
+                            keep = True
+                            break
+                if not keep:
+                    continue
 
-                execute_test_function(module_name + '.' + name, f, module_request)
+            if is_test_function:
+                execute_test_function(f'{module_name}.{name}', f, module_request)
+            elif is_test_class:
+                execute_test_class(f'{module_name}.{name}', f, module_request)
+
             if should_stop():
                 break
 
