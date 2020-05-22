@@ -13,7 +13,6 @@ help:
 
 clean: clean-build clean-pyc
 	rm -rf htmlcov/
-	rm -rf venv
 
 clean-build:
 	rm -fr build/
@@ -33,7 +32,7 @@ lint:
 	tox -e lint
 
 test:
-	python -m unittest tests/test_*.py
+	python -m unittest tests/test_*.py -v
 
 coverage:
 	coverage run --source=hammett -m unittest tests/test_*.py

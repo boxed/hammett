@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Iterable
 from unittest import SkipTest
 from datetime import datetime
 from hammett import fixtures as built_in_fixtures
@@ -512,7 +513,7 @@ def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
     if isinstance(names, str):
         names = [x.strip() for x in names.split(',')]
     # if you have just one argument, we allow to just pass a list instead of a list of lists, which is a pytest compatibility feature
-    if len(names) == 1 and len(param_list) != 1:
+    if len(names) == 1 and len(param_list) != 1 and not isinstance(param_list, Iterable):
         param_list = [param_list]
     for params in param_list:
         if not isinstance(params, (list, tuple)):
