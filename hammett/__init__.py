@@ -24,6 +24,11 @@ MISSING = object()
 _orig_print = print
 
 
+# pytest compatibility. I throw kwargs on the ground on purpose
+def param(*args, **kwargs):
+    return args
+
+
 def parametrize(argnames, argvalues, indirect=False, ids=None, scope=None):
     def parametrize_wrapper(f):
         try:
