@@ -180,6 +180,7 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
                 if param not in kwargs:
                     if param in fixtures:
                         params_by_name[param] = params_of(fixtures[param])
+                        reduced = True
                         break
             # If we can resolve this dependency fully
             if params.issubset(set(kwargs.keys())):
@@ -192,7 +193,7 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
                 reduced = True
                 del params_by_name[name]
         if not reduced:
-            raise FixturesUnresolvableException(f'Could not resolve fixtures any more, have {params_by_name} left.\nAvailable dependencies: {kwargs.keys()}')
+            raise FixturesUnresolvableException(f'Could not resolve fixtures for {f.__name__} any more.\nUnresolved:\n   {params_by_name}.\nAvailable dependencies:\n     {kwargs.keys()}\nFixtures:\n    {fixtures}')
 
     if request is not None:
         request.fixturenames = set(kwargs.keys())
@@ -410,8 +411,8 @@ def run_test(_name, _f, _module_request, **kwargs):
     register_fixture(request, autouse=True)
     del request
 
-    hijacked_stdout = StringIO()
-    hijacked_stderr = StringIO()
+    hammett.g.hijacked_stdout = StringIO()
+    hammett.g.hijacked_stderr = StringIO()
     prev_stdout = sys.stdout
     prev_stderr = sys.stderr
 
@@ -423,8 +424,8 @@ def run_test(_name, _f, _module_request, **kwargs):
     if hammett.g.verbose:
         hammett.print(_name + '...', end='', flush=True)
     try:
-        sys.stdout = hijacked_stdout
-        sys.stderr = hijacked_stderr
+        sys.stdout = hammett.g.hijacked_stdout
+        sys.stderr = hammett.g.hijacked_stderr
 
         if hammett.g.durations:
             start = datetime.now()
@@ -471,15 +472,15 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print(traceback.format_exc())
 
         hammett.print()
-        if hijacked_stdout.getvalue():
+        if hammett.g.hijacked_stdout.getvalue():
             hammett.print(YELLOW)
             hammett.print('--- stdout ---')
-            hammett.print(hijacked_stdout.getvalue())
+            hammett.print(hammett.g.hijacked_stdout.getvalue())
 
-        if hijacked_stderr.getvalue():
+        if hammett.g.hijacked_stderr.getvalue():
             hammett.print(RED)
             hammett.print('--- stderr ---')
-            hammett.print(hijacked_stderr.getvalue())
+            hammett.print(hammett.g.hijacked_stderr.getvalue())
 
         hammett.print(RESET_COLOR)
 
@@ -496,7 +497,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         status = FAILED
 
     assert status is not None
-    inc_test_result(status, _name, _f, duration, stdout=hijacked_stdout.getvalue(), stderr=hijacked_stderr.getvalue())
+    inc_test_result(status, _name, _f, duration, stdout=hammett.g.hijacked_stdout.getvalue(), stderr=hammett.g.hijacked_stderr.getvalue())
 
     # Tests can change this which breaks everything. Reset!
     os.chdir(hammett.g.orig_cwd)

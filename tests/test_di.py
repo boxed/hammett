@@ -52,5 +52,4 @@ class DITests(unittest.TestCase):
             dependency_injection_and_execute(lambda a: a, fixtures, {}, request=request)
             assert False, 'Did not raise'
         except FixturesUnresolvableException as e:
-            assert str(e) == '''Could not resolve fixtures any more, have {'a': {'b'}} left.
-Available dependencies: dict_keys([])'''
+            assert str(e).startswith('Could not resolve')

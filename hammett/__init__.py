@@ -99,6 +99,8 @@ class Globals:
         self.output = []
         self.result_db = None
         self.should_stop = False
+        self.hijacked_stdout = None
+        self.hijacked_stderr = None
 
     def reset(self):
         self.__init__()
