@@ -1,7 +1,13 @@
 import unittest
 
 from hammett import g
-from hammett.impl import feedback_for_exception
+from hammett.impl import build_feedback_for_exception
+
+
+def strip_colors(s):
+    import re
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', s)
 
 
 class RaiseTests(unittest.TestCase):
@@ -18,14 +24,13 @@ class RaiseTests(unittest.TestCase):
         try:
             raises_exception()
         except Exception:
-            feedback_for_exception()
+            output = build_feedback_for_exception()
 
-        assert g.get_log_without_colors() == """--- Local variables ---
+        assert strip_colors(output) == """--- Local variables ---
 local_5:
     5
 local_foo:
-    'foo'
-"""
+    'foo'""", repr(output)
 
     def test_assert_feedback(self):
         g.reset()
@@ -40,9 +45,9 @@ local_foo:
         try:
             raises_assertion()
         except AssertionError:
-            feedback_for_exception()
+            output = build_feedback_for_exception()
 
-        assert g.get_log_without_colors() == """--- Local variables ---
+        assert strip_colors(output) == """--- Local variables ---
 local_5:
     5
 local_foo:
@@ -52,8 +57,7 @@ local_foo:
 left:
     5
 right:
-    6
-"""
+    6""", repr(output)
 
     def test_multi_line_assert(self):
         g.reset()
@@ -70,9 +74,9 @@ right:
         try:
             raises_assertion()
         except AssertionError:
-            feedback_for_exception()
+            output = build_feedback_for_exception()
 
-        assert g.get_log_without_colors() == """--- Local variables ---
+        assert strip_colors(output) == """--- Local variables ---
 local_5:
     5
 local_foo:
@@ -82,8 +86,7 @@ local_foo:
 left:
     5
 right:
-    6
-"""
+    6""", repr(output)
 
     def test_multi_big_variables(self):
         g.reset()
@@ -117,7 +120,7 @@ right:
         try:
             raises_assertion()
         except AssertionError:
-            feedback_for_exception()
+            output = build_feedback_for_exception()
 
         expected = f"""--- Local variables ---
 sample:
@@ -142,6 +145,5 @@ right:
 +        Integer sagittis FOO! pretium pulvinar.
          Nullam aliquet congue faucibus.
          Aenean ex dolor, aliquet at malesuada quis, varius et velit.
-         Donec sed arcu mauris. Maecenas quis vulputate dolor.
-"""
-        assert g.get_log_without_colors() == expected
+         Donec sed arcu mauris. Maecenas quis vulputate dolor."""
+        assert strip_colors(output) == expected, repr(output)

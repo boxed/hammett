@@ -1,8 +1,13 @@
 import os
 import sys
 from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Optional
 from unittest import SkipTest
-from datetime import datetime
+from datetime import (
+    datetime,
+    timedelta,
+)
 from hammett import fixtures as built_in_fixtures
 
 import hammett
@@ -259,23 +264,27 @@ def pretty_format(x, _indent=0):
         return repr(x)
 
 
-def feedback_for_exception():
+def build_feedback_for_exception():
     type, value, tb = sys.exc_info()
     while tb.tb_next:
         tb = tb.tb_next
 
+    result = []
+
     local_variables = tb.tb_frame.f_locals
     if local_variables:
-        hammett.print('--- Local variables ---')
+        result.append('--- Local variables ---')
         for k, v in sorted(local_variables.items()):
-            hammett.print(f'{k}:')
+            result.append(f'{k}:')
             try:
-                hammett.print(indent(pretty_format(v)))
+                result.append(indent(pretty_format(v)))
             except Exception as e:
-                hammett.print(f'   Error getting local variable repr: {e}')
+                result.append(f'   Error getting local variable repr: {e}')
 
     if type == AssertionError:
-        analyze_assert(tb)
+        result.append(analyze_assert(tb))
+
+    return '\n'.join(result)
 
 
 DIFF_STRING_SIZE_CUTOFF = 100
@@ -283,7 +292,9 @@ DIFF_STRING_SIZE_CUTOFF = 100
 
 def analyze_assert(tb):
     if hammett.g.disable_assert_analyze:
-        return
+        return ''
+
+    result = []
 
     # grab assert source line
     try:
@@ -294,7 +305,7 @@ def analyze_assert(tb):
             with open(os.path.join(hammett.g.orig_cwd, tb.tb_frame.f_code.co_filename)) as f:
                 source = f.read().split('\n')
         except FileNotFoundError:
-            hammett.print('Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
+            result.append('Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
             return
 
     line_no = tb.tb_frame.f_lineno - 1
@@ -306,7 +317,7 @@ def analyze_assert(tb):
         relevant_source = source[line_no] + '\n' + relevant_source
 
     if not relevant_source.strip().startswith('assert '):
-        hammett.print('Failed to analyze assert statement (Did not find the assert)')
+        result.append('Failed to analyze assert statement (Did not find the assert)')
         return
 
     import ast
@@ -318,29 +329,29 @@ def analyze_assert(tb):
             relevant_source += '\n' + source[tb.tb_frame.f_lineno]
             assert_statement = ast.parse(relevant_source.strip()).body[0]
         except SyntaxError:
-            hammett.print('Failed to analyze assert statement (SyntaxError)')
+            result.append('Failed to analyze assert statement (SyntaxError)')
             return
 
     # We only analyze further if it's a comparison
     if assert_statement.test.__class__.__name__ != 'Compare':
         return
 
-    hammett.print()
-    hammett.print('--- Assert components ---')
+    result.append('')
+    result.append('--- Assert components ---')
     from astunparse import unparse
     try:
         left = eval(unparse(assert_statement.test.left), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
-        hammett.print('left:')
-        hammett.print(indent(pretty_format(left)))
+        result.append('left:')
+        result.append(indent(pretty_format(left)))
         right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     except Exception as e:
-        hammett.print(f'Failed to analyze assert statement ({type(e)}: {e})')
+        result.append(f'Failed to analyze assert statement ({type(e)}: {e})')
         return
-    hammett.print('right:')
-    hammett.print(indent(pretty_format(right)))
+    result.append('right:')
+    result.append(indent(pretty_format(right)))
     if isinstance(left, str) and isinstance(right, str) and len(left) > DIFF_STRING_SIZE_CUTOFF and len(right) > DIFF_STRING_SIZE_CUTOFF and '\n' in left:
-        hammett.print()
-        hammett.print('--- Diff of left and right assert components ---')
+        result.append('')
+        result.append('--- Diff of left and right assert components ---')
         left_lines = left.split('\n')
         right_lines = right.split('\n')
         from difflib import unified_diff
@@ -352,7 +363,9 @@ def analyze_assert(tb):
                     '-': RED,
                     '@': MAGENTA,
                 }.get(line[0], '')
-            hammett.print(f'{color}{line}{RESET_COLOR}')
+            result.append(f'{color}{line}{RESET_COLOR}')
+
+    return '\n'.join(result)
 
 
 SKIPPED = 'skipped'
@@ -380,25 +393,64 @@ MSG_SUCCESS_VERBOSE = f' {GREEN}Success{RESET_COLOR}'
 MSG_SUCCESS = f'{GREEN}.{RESET_COLOR}'
 
 
-def inc_test_result(status, _name, _f, duration, stdout, stderr):
+@dataclass
+class Result:
+    status: str
+    duration: Optional[timedelta] = 0
+    stdout: str = ''
+    stderr: str = ''
+    stack_trace: str = ''
+    feedback_for_exception: str = ''
+
+
+def print_status(_name, result: Result):
     verbose = hammett.g.verbose
-    message = MESSAGES[status]['v' if verbose else 's']
+    message = MESSAGES[result.status]['v' if verbose else 's']
     if verbose:
-        hammett.print(message + (str(duration) if duration else ''))
+        hammett.print(message + (str(result.duration) if result.duration else ''))
     else:
         hammett.print(message, end='', flush=True)
 
-    if hammett.g.fail_fast and status not in ('success', 'skipped'):
+    if result.status == FAILED:
+        hammett.print(RED)
+        if not hammett.g.verbose:
+            hammett.print()
+        hammett.print('Failed: ', _name)
+        hammett.print()
+
+        hammett.print(result.stack_trace)
+
+        hammett.print()
+        if result.stdout:
+            hammett.print(YELLOW)
+            hammett.print('--- stdout ---')
+            hammett.print(result.stdout)
+
+        if result.stderr:
+            hammett.print(RED)
+            hammett.print('--- stderr ---')
+            hammett.print(result.stderr)
+
+        hammett.print(RESET_COLOR)
+
+    if result.feedback_for_exception:
+        hammett.print(result.feedback_for_exception)
+
+
+def inc_test_result(_name, _f, result):
+    print_status(_name, result)
+
+    if hammett.g.fail_fast and result.status not in ('success', 'skipped'):
         hammett.g.should_stop = True
 
     filename = _f.__module__.replace('.', os.sep) + '.py'
     _name = _name[len(_f.__module__) + 1:]
-    hammett.g.result_db['test_results'][filename][_name] = dict(stdout=stdout, stderr=stderr, status=status)
+    hammett.g.result_db['test_results'][filename][_name] = result
 
 
 def run_test(_name, _f, _module_request, **kwargs):
     if should_skip(_f):
-        inc_test_result(SKIPPED, _name, _f, duration=0, stdout='', stderr='')
+        inc_test_result(_name, _f, Result(status=SKIPPED))
         return
 
     from io import StringIO
@@ -420,6 +472,8 @@ def run_test(_name, _f, _module_request, **kwargs):
     duration = None
     start = None
     setup_time = None
+    stack_trace = None
+    feedback_for_exception = None
 
     if hammett.g.verbose:
         hammett.print(_name + '...', end='', flush=True)
@@ -462,42 +516,32 @@ def run_test(_name, _f, _module_request, **kwargs):
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
 
-        hammett.print(RED)
-        if not hammett.g.verbose:
-            hammett.print()
-        hammett.print('Failed:', _name)
-        hammett.print()
-
         import traceback
-        hammett.print(traceback.format_exc())
-
-        hammett.print()
-        if hammett.g.hijacked_stdout.getvalue():
-            hammett.print(YELLOW)
-            hammett.print('--- stdout ---')
-            hammett.print(hammett.g.hijacked_stdout.getvalue())
-
-        if hammett.g.hijacked_stderr.getvalue():
-            hammett.print(RED)
-            hammett.print('--- stderr ---')
-            hammett.print(hammett.g.hijacked_stderr.getvalue())
-
-        hammett.print(RESET_COLOR)
+        stack_trace = traceback.format_exc()
 
         if not hammett.g.quiet:
-            feedback_for_exception()
-
-        if hammett.g.drop_into_debugger:
-            try:
-                import ipdb as pdb
-            except ImportError:
-                import pdb
-            pdb.set_trace()
+            feedback_for_exception = build_feedback_for_exception()
 
         status = FAILED
 
     assert status is not None
-    inc_test_result(status, _name, _f, duration, stdout=hammett.g.hijacked_stdout.getvalue(), stderr=hammett.g.hijacked_stderr.getvalue())
+
+    result = Result(
+        status=status, duration=duration,
+        stdout=hammett.g.hijacked_stdout.getvalue(),
+        stderr=hammett.g.hijacked_stderr.getvalue(),
+        stack_trace=stack_trace,
+        feedback_for_exception=feedback_for_exception,
+    )
+
+    inc_test_result(_name, _f, result=result)
+
+    if status == FAILED and hammett.g.drop_into_debugger:
+        try:
+            import ipdb as pdb
+        except ImportError:
+            import pdb
+        pdb.set_trace()
 
     # Tests can change this which breaks everything. Reset!
     os.chdir(hammett.g.orig_cwd)

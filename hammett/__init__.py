@@ -105,14 +105,6 @@ class Globals:
     def reset(self):
         self.__init__()
 
-    def get_log_without_colors(self):
-        import re
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        return ansi_escape.sub('', ''.join([
-            str(args) + end
-            for args, end, flush in self.output
-        ]))
-
 
 g = Globals()
 
@@ -318,7 +310,7 @@ def collect_file_data(path):
     return data
 
 
-DB_VERSION = 1
+DB_VERSION = 2
 DB_FILENAME = '.hammett-db'
 
 
@@ -397,7 +389,7 @@ def update_result_db(result_db, new_file_data):
 def finish():
     for x in g.result_db['test_results'].values():
         for y in x.values():
-            g.results[y['status']] += 1
+            g.results[y.status] += 1
 
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
@@ -478,6 +470,9 @@ source_location=.
 
         cache_filename = join(dirname, filename)
         if cache_filename in g.result_db['test_results']:
+            from hammett.impl import print_status
+            for test_name, result in g.result_db['test_results'][cache_filename].items():
+                print_status(test_name, result)
             continue
 
         # We do this here because if all test results are up to date, we want to avoid loading slow plugins!
