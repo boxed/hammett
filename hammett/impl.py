@@ -407,7 +407,7 @@ def print_status(_name, result: Result):
     verbose = hammett.g.verbose
     message = MESSAGES[result.status]['v' if verbose else 's']
     if verbose:
-        hammett.print(message + (str(result.duration) if result.duration else ''))
+        hammett.print(_name + ' ' + message + (str(result.duration) if result.duration else ''))
     else:
         hammett.print(message, end='', flush=True)
 
