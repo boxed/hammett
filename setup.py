@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import sys
 from io import open
 from setuptools import Command, setup
 
@@ -69,6 +70,11 @@ class ReleaseCheck(Command):
 
 # NB: _don't_ add namespace_packages to setup(), it'll break
 #     everything using imp.find_module
+
+additional_requirements = []
+if sys.version_info[:2] < (3, 6):
+    additional_requirements = ['dataclasses']
+
 setup(
     name='hammett',
     version=read_version(),
@@ -79,7 +85,7 @@ setup(
     url='https://github.com/boxed/hammett',
     packages=['hammett'],
     include_package_data=True,
-    install_requires=read_reqs('requirements.txt'),
+    install_requires=read_reqs('requirements.txt') + additional_requirements,
     license="BSD",
     zip_safe=False,
     keywords='hammett',
