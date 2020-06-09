@@ -24,12 +24,12 @@ jobs:
         - codecov
 
     - python: "3.6"
-      before_install: pip install tox
+      before_install: pip install tox dataclasses
       script: make test
       dist: xenial
 
     - python: pypy3
-      before_install: pip install tox
+      before_install: pip install tox dataclasses
       script: make test
       dist: xenial
 
