@@ -306,7 +306,7 @@ def analyze_assert(tb):
                 source = f.read().split('\n')
         except FileNotFoundError:
             result.append('Failed to analyze assert statement: file not found. Most likely there was a change of current directory.')
-            return
+            return '\n'.join(result)
 
     line_no = tb.tb_frame.f_lineno - 1
     relevant_source = source[line_no]
@@ -318,7 +318,7 @@ def analyze_assert(tb):
 
     if not relevant_source.strip().startswith('assert '):
         result.append('Failed to analyze assert statement (Did not find the assert)')
-        return
+        return '\n'.join(result)
 
     import ast
     try:
@@ -330,11 +330,11 @@ def analyze_assert(tb):
             assert_statement = ast.parse(relevant_source.strip()).body[0]
         except SyntaxError:
             result.append('Failed to analyze assert statement (SyntaxError)')
-            return
+            return '\n'.join(result)
 
     # We only analyze further if it's a comparison
     if assert_statement.test.__class__.__name__ != 'Compare':
-        return
+        return '\n'.join(result)
 
     result.append('')
     result.append('--- Assert components ---')
@@ -346,7 +346,7 @@ def analyze_assert(tb):
         right = eval(unparse(assert_statement.test.comparators), tb.tb_frame.f_globals, tb.tb_frame.f_locals)
     except Exception as e:
         result.append(f'Failed to analyze assert statement ({type(e)}: {e})')
-        return
+        return '\n'.join(result)
     result.append('right:')
     result.append(indent(pretty_format(right)))
     if isinstance(left, str) and isinstance(right, str) and len(left) > DIFF_STRING_SIZE_CUTOFF and len(right) > DIFF_STRING_SIZE_CUTOFF and '\n' in left:
