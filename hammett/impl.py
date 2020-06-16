@@ -593,7 +593,13 @@ def execute_test_class(_name, _c, module_request):
         if member_name.startswith('test_'):
             test_func = getattr(test_case, member_name)
             if setup_method is not None:
-                setup_method(test_func)
+                try:
+                    setup_method(test_func)
+                except Exception:
+                    import traceback
+                    print('Crash when running setup_method:')
+                    traceback.print_exc()
+                    continue
             execute_test_function(f'{_name}.{member_name}', test_func, module_request)
 
     try:
