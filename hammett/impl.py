@@ -577,13 +577,29 @@ def execute_test_function(_name, _f, module_request):
 
 def execute_test_class(_name, _c, module_request):
     test_case = _c()
-    test_case.setUp()
+    try:
+        test_case.setUp()
+    except AttributeError:
+        pass
+
+    try:
+        test_case.setup_class()
+    except AttributeError:
+        pass
+
+    setup_method = getattr(test_case, 'setup_method', None)
 
     for member_name in dir(test_case):
         if member_name.startswith('test_'):
-            execute_test_function(f'{_name}.{member_name}', getattr(test_case, member_name), module_request)
+            test_func = getattr(test_case, member_name)
+            if setup_method is not None:
+                setup_method(test_func)
+            execute_test_function(f'{_name}.{member_name}', test_func, module_request)
 
-    test_case.tearDown()
+    try:
+        test_case.tearDown()
+    except AttributeError:
+        pass
 
     # return run_test(_name, _f, module_request)
 

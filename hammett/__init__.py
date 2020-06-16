@@ -512,7 +512,7 @@ source_location=.
                 f = m(f)
 
             is_test_function = name.startswith('test_') and callable(f)
-            is_test_class = isinstance(f, type) and issubclass(f, TestCase)
+            is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
 
             if not is_test_function and not is_test_class:
                 continue
