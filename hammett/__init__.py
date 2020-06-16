@@ -245,11 +245,15 @@ def parse_markers(markers):
 
 
 def guess_modules_and_source_path():
-    this_dir = os.getcwd().split(os.sep)[-1]
     if isdir('lib'):
         return listdir('lib'), 'lib'
     elif isdir('src'):
         return listdir('src'), 'src'
+
+    this_dir = os.getcwd().split(os.sep)[-1]
+
+    if this_dir.startswith('py-'):
+        this_dir = this_dir[len('py-'):]
 
     if isdir(this_dir):
         return [this_dir], '.'
