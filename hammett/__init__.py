@@ -434,6 +434,8 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     g.source_location = g.settings.get('source_location', '.')
     g.modules = g.settings.get('modules')
+    if isinstance(g.modules, str):
+        g.modules = [g.modules]
     if g.modules is None:
         m, s = guess_modules_and_source_path()
         g.source_location = g.source_location or s
@@ -445,7 +447,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
 
     filenames = collect_files(filenames)
     if not filenames:
-        print('No tests found.')
+        print('No module to test found.')
         print('''You might need to add `modules` and `source_location` item under [hammett] in setup.cfg  like:
 
 [hammett]
