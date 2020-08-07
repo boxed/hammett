@@ -51,6 +51,9 @@ class ExceptionInfo:
     def __str__(self):
         return f'<ExceptionInfo: type={self.type} value={self.value}'
 
+    def __repr__(self):
+        return str(self)
+
 
 fixtures = {}
 auto_use_fixtures = set()
@@ -332,6 +335,7 @@ def analyze_assert(tb):
             result.append('Failed to analyze assert statement (SyntaxError)')
             return '\n'.join(result)
 
+    # TODO: we should also analyze single values
     # We only analyze further if it's a comparison
     if assert_statement.test.__class__.__name__ != 'Compare':
         return '\n'.join(result)
