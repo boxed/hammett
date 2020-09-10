@@ -160,7 +160,7 @@ def call_fixture_func(fixturefunc, request, kwargs):
     return res
 
 
-def dependency_injection(f, fixtures, orig_kwargs, request):
+def dependency_injection(f, fixtures, request):
     fixtures = fixtures.copy()
     f_params = params_of(f)
     params_by_name = {
@@ -207,12 +207,12 @@ def dependency_injection(f, fixtures, orig_kwargs, request):
         request.fixturenames = set(kwargs.keys())
     # prune again, to get rid of auto use fixtures that f doesn't take
     kwargs = {k: v for k, v in kwargs.items() if k in f_params}
-    return f, {**kwargs, **orig_kwargs}
+    return f, kwargs
 
 
 def dependency_injection_and_execute(f, fixtures, orig_kwargs, request):
-    f, kwargs = dependency_injection(f, fixtures, orig_kwargs, request)
-    return f(**kwargs)
+    f, kwargs = dependency_injection(f, fixtures, request)
+    return f(**kwargs, **orig_kwargs)
 
 
 def should_stop():
@@ -488,7 +488,8 @@ def run_test(_name, _f, _module_request, **kwargs):
         if hammett.g.durations:
             start = datetime.now()
 
-        resolved_function, resolved_kwargs = dependency_injection(_f, fixtures, kwargs, request=req)
+        resolved_function, resolved_kwargs = dependency_injection(_f, fixtures, request=req)
+        resolved_kwargs = {**resolved_kwargs, **kwargs}
 
         if hammett.g.durations:
             setup_time = datetime.now() - start
