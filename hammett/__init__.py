@@ -101,6 +101,7 @@ class Globals:
         self.should_stop = False
         self.hijacked_stdout = None
         self.hijacked_stderr = None
+        self.use_cache = None
 
     def reset(self):
         self.__init__()
@@ -176,6 +177,7 @@ class Request:
         self.finalizers = []
         self.fixture_results = {}
         self.funcargnames = []
+        self.catch_log_handler = None
 
         self.config = Config()
 
@@ -341,6 +343,8 @@ def new_result_db():
 
 
 def read_result_db():
+    if not g.use_cache:
+        return new_result_db()
     from pickle import load
     try:
         with open(DB_FILENAME, 'rb') as f:
@@ -396,7 +400,7 @@ def finish():
             g.results[y.status] += 1
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=True):
     import sys
     if sys.version_info[:2] < (3, 6):
         print('hammett requires python 3.6 or later')
@@ -428,6 +432,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     g.drop_into_debugger = drop_into_debugger
     g.durations = durations
     g.disable_assert_analyze = disable_assert_analyze
+    g.use_cache = use_cache
 
     from hammett.impl import read_settings, load_plugins
     read_settings()

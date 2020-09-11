@@ -15,7 +15,11 @@ from hammett.impl import (
 
 class FixtureDecoratorTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.orig_fixtures = fixtures.copy()
         fixtures.clear()
+
+    def tearDown(self) -> None:
+        fixtures.update(self.orig_fixtures)
 
     def test_simplest(self):
         assert 'foo' not in fixtures

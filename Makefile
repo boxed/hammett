@@ -25,31 +25,34 @@ clean-pyc:
 	find . -name '*~' -exec rm -f {} +
 	find . -name "__pycache__" -type d -delete
 
+clean-cache:
+	find . -name '.hammett-db' -exec rm -f {} +
+
 clean-docs:
 	rm -f docs/tri*.rst
 
 lint:
 	tox -e lint
 
-test:
-	python -m unittest tests/test_*.py -v
+test: clean-cache
+	venv/bin/python -m unittest tests/test_*.py -v
 
 coverage:
-	coverage run --source=hammett -m unittest tests/test_*.py
+	venv/bin/coverage run --source=hammett -m unittest tests/test_*.py
 
 docs:
 	tox -e docs
 
 dist: clean
-	python setup.py sdist
-	python setup.py bdist_wheel
+	venv/bin/python setup.py sdist
+	venv/bin/python setup.py bdist_wheel
 	ls -l dist
 
 tag:
-	python setup.py tag
+	venv/bin/python setup.py tag
 
 release-check:
-	python setup.py release_check
+	venv/bin/python setup.py release_check
 
 venv:
 	python3 -m venv venv

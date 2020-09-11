@@ -110,11 +110,11 @@ _params_of_cache = {}
 def params_of(f):
     if f not in _params_of_cache:
         import inspect
-        _params_of_cache[f] = set(
+        _params_of_cache[f] = {
             x.name
             for x in inspect.signature(f).parameters.values()
             if x.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-        )
+        }
     return _params_of_cache[f]
 
 
@@ -162,51 +162,33 @@ def call_fixture_func(fixturefunc, request, kwargs):
 
 def dependency_injection(f, fixtures, request):
     fixtures = fixtures.copy()
-    f_params = params_of(f)
-    params_by_name = {
-        name: params_of(fixture)
-        for name, fixture in fixtures.items()
-        # prune the fixture list based on what f needs
-        if name in f_params or name in auto_use_fixtures or name == 'request'
-    }
 
-    def add_fixture(kwargs, name, indent=0):
-        if name in kwargs:
-            return
+    requested = params_of(f) | (request.additional_fixtures_wanted if request is not None else set())
 
-        params = params_of(fixtures[name])
-        for param in params:
-            add_fixture(kwargs, param, indent+1)
-        params_by_name[name] = params
+    fully_resolved = dict(
+        request=request,
+    )
 
-    kwargs = {}
-    while params_by_name:
+    unresolved = {name for name in requested if name not in fully_resolved}
+
+    while unresolved:
         reduced = False
-        for name, params in list(params_by_name.items()):
-            # If we have a dependency that we have pruned, unprune it
-            for param in params:
-                if param not in kwargs:
-                    if param in fixtures:
-                        params_by_name[param] = params_of(fixtures[param])
-                        reduced = True
-                        break
-            # If we can resolve this dependency fully
-            if params.issubset(set(kwargs.keys())):
-                assert name not in kwargs
-                kwargs[name] = call_fixture_func(fixtures[name], request, pick_keys(kwargs, params))
-                if request is not None:
-                    request.fixturenames.add(name)
-                    for x in request.additional_fixtures_wanted:
-                        add_fixture(kwargs, x)
-                reduced = True
-                del params_by_name[name]
-        if not reduced:
-            raise FixturesUnresolvableException(f'Could not resolve fixtures for {f.__name__} any more.\nUnresolved:\n   {params_by_name}.\nAvailable dependencies:\n     {kwargs.keys()}\nFixtures:\n    {fixtures}')
+        for name in list(unresolved):
+            params = params_of(fixtures[name])
 
-    if request is not None:
-        request.fixturenames = set(kwargs.keys())
-    # prune again, to get rid of auto use fixtures that f doesn't take
-    kwargs = {k: v for k, v in kwargs.items() if k in f_params}
+            # Add indirect dependencies to unresolved
+            unresolved |= params
+
+            # If we can resolve this dependency fully, remove it from unresolved list
+            if params.issubset(set(fully_resolved.keys())):
+                fully_resolved[name] = call_fixture_func(fixtures[name], request, pick_keys(fully_resolved, params))
+                unresolved.remove(name)
+                reduced = True
+
+        if not reduced:
+            raise FixturesUnresolvableException(f'Could not resolve fixtures for {f.__name__} any more.\nUnresolved:\n   {unresolved}.\nAvailable dependencies:\n     {fixtures.keys()}\nFully resolved:\n    {fully_resolved.keys()}')
+
+    kwargs = {k: v for k, v in fully_resolved.items() if k in params_of(f)}
     return f, kwargs
 
 
