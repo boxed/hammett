@@ -35,29 +35,29 @@ lint:
 	tox -e lint
 
 test: clean-cache
-	venv/bin/python -m unittest tests/test_*.py -v
+	python -m unittest tests/test_*.py -v
 
 coverage:
-	venv/bin/coverage run --source=hammett -m unittest tests/test_*.py
+	coverage run --source=hammett -m unittest tests/test_*.py
 
 docs:
 	tox -e docs
 
 dist: clean
-	venv/bin/python setup.py sdist
-	venv/bin/python setup.py bdist_wheel
+	python setup.py sdist
+	python setup.py bdist_wheel
 	ls -l dist
 
 tag:
-	venv/bin/python setup.py tag
+	python setup.py tag
 
 release-check:
-	venv/bin/python setup.py release_check
+	python setup.py release_check
 
 venv:
 	python3 -m venv venv
 	venv/bin/pip install -r requirements.txt
 
 run-examples: venv
-	venv/bin/python examples/manage.py migrate
-	venv/bin/python examples/manage.py runserver
+	python examples/manage.py migrate
+	python examples/manage.py runserver
