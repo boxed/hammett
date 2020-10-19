@@ -6,6 +6,7 @@ from hammett import (
     Request,
 )
 from hammett.impl import (
+    auto_use_fixtures,
     fixtures,
     dependency_injection_and_execute,
     indent,
@@ -20,6 +21,7 @@ class FixtureDecoratorTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         fixtures.update(self.orig_fixtures)
+        auto_use_fixtures.clear()
 
     def test_simplest(self):
         assert 'foo' not in fixtures

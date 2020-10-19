@@ -14,8 +14,6 @@ class SuitesTests(unittest.TestCase):
         base = dirname(dirname(abspath(__file__)))
         suites_base = abspath(join(base, 'tests', 'suites'))
         for d in os.listdir(suites_base):
-            if d != 'suite_3_fixture':
-                continue
             p = os.path.join(suites_base, d)
             if not os.path.isdir(p):
                 continue
@@ -32,6 +30,7 @@ class SuitesTests(unittest.TestCase):
                     print('-------')
                     print('suite', d)
                     print('g.results', g.results)
+                    print('asserts', asserts.strip())
                     print('exit_code', exit_code)
                     print('base', base)
                     print('output:')

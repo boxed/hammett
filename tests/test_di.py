@@ -1,10 +1,7 @@
 import unittest
 
 from hammett import Request
-from hammett.impl import (
-    dependency_injection_and_execute,
-    FixturesUnresolvableException,
-)
+from hammett.impl import dependency_injection_and_execute
 
 
 class DITests(unittest.TestCase):
@@ -51,5 +48,5 @@ class DITests(unittest.TestCase):
         try:
             dependency_injection_and_execute(lambda a: a, fixtures, {}, request=request)
             assert False, 'Did not raise'
-        except FixturesUnresolvableException as e:
-            assert str(e).startswith('Could not resolve')
+        except TypeError as e:
+            assert 'missing 1 required positional argument' in str(e)

@@ -73,15 +73,15 @@ class WarnsContext(object):
             return
 
         if self.expected_warning is not None:
-            if not any(isinstance(w, self.expected_warning) for w in self.caught_warnings):
+            if not any(isinstance(w.message, self.expected_warning) for w in self.caught_warnings):
                 found = '\n'.join(str(x) for x in self.caught_warnings)
-                print(f'No warning of type {self.expected_warning} was emitted. These were found:\n\n{found}')
+                assert False, f'No warning of type {self.expected_warning} was emitted. These were found:\n\n{found}'
 
         if self.match_expr:
             import re
             if not any(re.search(self.match_expr, str(x.message)) for x in self.caught_warnings):
                 found = '\n'.join(str(x) for x in self.caught_warnings)
-                print(f'No warning matching {self.match_expr!r} was emitted. These were found:\n\n{found}')
+                assert False, f'No warning matching {self.match_expr!r} was emitted. These were found:\n\n{found}'
 
 
 class WarningInfo:
@@ -139,10 +139,6 @@ def pick_keys(kwargs, params):
         for k, v in kwargs.items()
         if k in params
     }
-
-
-class FixturesUnresolvableException(Exception):
-    pass
 
 
 _params_of_cache = {}
@@ -217,6 +213,9 @@ def dependency_injection(f, fixtures, request):
     while unresolved:
         reduced = False
         for name in list(unresolved):
+            if name not in fixtures:
+                continue
+
             params = params_of(fixtures[name])
 
             # Add indirect dependencies to unresolved
@@ -234,7 +233,7 @@ def dependency_injection(f, fixtures, request):
             reduced = True
 
         if not reduced:
-            raise FixturesUnresolvableException(f'Could not resolve fixtures for {f.__name__} any more.\nUnresolved:\n   {unresolved}.\nAvailable dependencies:\n     {fixtures.keys()}\nFully resolved:\n    {fully_resolved.keys()}')
+            break
 
     kwargs = {k: v for k, v in fully_resolved.items() if k in params_of(f)}
     return f, kwargs
