@@ -204,7 +204,9 @@ def call_fixture_func(fixturefunc, request, kwargs):
 def dependency_injection(f, fixtures, request):
     fixtures = fixtures.copy()
 
-    requested = params_of(f) | (request.additional_fixtures_wanted if request is not None else set())
+    requested = params_of(f) | (request.additional_fixtures_wanted if request is not None else set()) | auto_use_fixtures
+
+    request.additional_fixtures_wanted.clear()
 
     fully_resolved = dict(
         request=request,
@@ -225,6 +227,11 @@ def dependency_injection(f, fixtures, request):
                 fully_resolved[name] = call_fixture_func(fixtures[name], request, pick_keys(fully_resolved, params))
                 unresolved.remove(name)
                 reduced = True
+
+        if request.additional_fixtures_wanted:
+            unresolved |= request.additional_fixtures_wanted
+            request.additional_fixtures_wanted.clear()
+            reduced = True
 
         if not reduced:
             raise FixturesUnresolvableException(f'Could not resolve fixtures for {f.__name__} any more.\nUnresolved:\n   {unresolved}.\nAvailable dependencies:\n     {fixtures.keys()}\nFully resolved:\n    {fully_resolved.keys()}')
