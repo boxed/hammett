@@ -1,7 +1,13 @@
 Changelog
 ---------
 
-0.9.1 (2020-09-11)
+0.9.2 (2020-10-19
+~~~~~~~~~~~~~~~~~~
+
+* Fixed some really bad bugs relating to fixtures
+
+
+0.9.1 (2020-10-19)
 ~~~~~~~~~~~~~~~~~~
 
 * Fixed plugins dynamically adding implicit fixtures. This fixes pytest-django
