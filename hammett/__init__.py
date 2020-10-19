@@ -400,7 +400,7 @@ def finish():
             g.results[y.status] += 1
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=True):
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=False):
     import sys
     if sys.version_info[:2] < (3, 6):
         print('hammett requires python 3.6 or later')
@@ -619,6 +619,7 @@ def main_cli(args=None):
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
     parser.add_argument('-k', dest='match', default=None)
     parser.add_argument('-m', dest='markers', default=None)
+    parser.add_argument('--use-cache', dest='use_cache', default=False, help='The cache is an experimental feature to run only relevant changes based on looking at what files have been changed.')
     parser.add_argument('--durations', dest='durations', action='store_true', default=False)
     parser.add_argument('--no-assert-analyze', dest='disable_assert_analyze', action='store_true', default=False)
     parser.add_argument('--pdb', dest='drop_into_debugger', action='store_true', default=False)
@@ -635,6 +636,7 @@ def main_cli(args=None):
         durations=args.durations,
         markers=args.markers,
         disable_assert_analyze=args.disable_assert_analyze,
+        use_cache=args.use_cache,
     )
 
 
