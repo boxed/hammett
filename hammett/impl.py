@@ -1,6 +1,8 @@
 import os
 import sys
 from collections.abc import Iterable
+from warnings import catch_warnings
+
 from dataclasses import dataclass
 from typing import Optional
 from unittest import SkipTest
@@ -50,6 +52,45 @@ class ExceptionInfo:
 
     def __str__(self):
         return f'<ExceptionInfo: type={self.type} value={self.value}'
+
+    def __repr__(self):
+        return str(self)
+
+
+class WarnsContext(object):
+    def __init__(self, expected_warning=None, match=None):
+        self.expected_warning = expected_warning
+        self.match_expr = match
+
+    def __enter__(self):
+        self.warning_catcher = catch_warnings(record=True)
+        self.caught_warnings = self.warning_catcher.__enter__()
+        return self.caught_warnings
+
+    def __exit__(self, *tp):
+        self.warning_catcher.__exit__()
+        if tp[0]:
+            return
+
+        if self.expected_warning is not None:
+            if not any(isinstance(w, self.expected_warning) for w in self.caught_warnings):
+                found = '\n'.join(str(x) for x in self.caught_warnings)
+                print(f'No warning of type {self.expected_warning} was emitted. These were found:\n\n{found}')
+
+        if self.match_expr:
+            import re
+            if not any(re.search(self.match_expr, str(x.message)) for x in self.caught_warnings):
+                found = '\n'.join(str(x) for x in self.caught_warnings)
+                print(f'No warning matching {self.match_expr!r} was emitted. These were found:\n\n{found}')
+
+
+class WarningInfo:
+    def __init__(self):
+        self.type = None
+        self.value = None
+
+    def __str__(self):
+        return f'<WarningInfo: type={self.type} value={self.value}'
 
     def __repr__(self):
         return str(self)
