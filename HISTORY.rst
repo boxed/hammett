@@ -1,6 +1,44 @@
 Changelog
 ---------
 
+0.9.1 (2020-09-11)
+~~~~~~~~~~~~~~~~~~
+
+* Fixed plugins dynamically adding implicit fixtures. This fixes pytest-django
+
+* Implemented support for pytest.warns/hammett.warns
+
+* Make cache default off, since it's still rather flaky
+
+
+0.9.0 (2020-09-11)
+~~~~~~~~~~~~~~~~~~
+
+* Added support for `caplog`
+
+* Don't try to collect hidden files
+
+
+0.8.0 (2020-09-07)
+~~~~~~~~~~~~~~~~~~
+
+* Added support for the `capsys` feature from pytest
+
+* Fixed verbose output
+
+* Improved test feedback
+
+* Support for class based tests (like unittest)
+
+* Also search for *_test.py, since it seems pytest tries these
+
+* Compatibility with a funny little pytest feature where you can pass a list and not a list of a list to parametrize if you have just one argument
+
+* Pixed python 3.6 support
+
+* Sort local variables in error output
+
+
 0.7.1 (2020-05-20)
 ~~~~~~~~~~~~~~~~~~
 
