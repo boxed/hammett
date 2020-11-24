@@ -333,6 +333,9 @@ def write_result_db(results):
     test_results: dict from filename -> (dict from test_name -> dict(stdout=str, stderr=str, status=str))
     file_data: dict filename -> nanosecond modification date
     """
+    if not g.use_cache:
+        return
+
     results['db_version'] = DB_VERSION
     from pickle import dump
     with open(DB_FILENAME, 'wb') as f:
@@ -369,6 +372,9 @@ def drop_cache_for_filename(result_db, filename):
 
 
 def update_result_db(result_db, new_file_data):
+    if not g.use_cache:
+        return
+
     if result_db['file_data'] is None:
         result_db['file_data'] = new_file_data
         assert not result_db['test_results']
@@ -406,6 +412,11 @@ def finish():
 
 
 def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=False):
+    params = main_setup(verbose=verbose, fail_fast=fail_fast, quiet=quiet, filenames=filenames, drop_into_debugger=drop_into_debugger, durations=durations, markers=markers, disable_assert_analyze=disable_assert_analyze, cwd=cwd, use_cache=use_cache)
+    return main_run_tests(match=match, module_unload=module_unload, **params)
+
+
+def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, durations=False, markers=None, disable_assert_analyze=False, cwd=None, use_cache=False):
     import sys
     if sys.version_info[:2] < (3, 6):
         print('hammett requires python 3.6 or later')
@@ -427,7 +438,6 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
         sys.path.insert(0, cwd)
         clean_up_sys_path = True
 
-    from hammett.impl import should_stop
     g.reset()
 
     g.results = dict(success=0, failed=0, skipped=0, abort=0)
@@ -439,7 +449,7 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     g.disable_assert_analyze = disable_assert_analyze
     g.use_cache = use_cache
 
-    from hammett.impl import read_settings, load_plugins
+    from hammett.impl import read_settings
     read_settings()
 
     g.source_location = g.settings.get('source_location', '.')
@@ -455,7 +465,14 @@ def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_
     update_result_db(g.result_db, collect_file_data(g.source_location))
     write_result_db(g.result_db)
 
-    filenames = collect_files(filenames)
+    return dict(
+        filenames=collect_files(filenames),
+        markers=markers,
+        clean_up_sys_path=clean_up_sys_path,
+    )
+
+
+def main_run_tests(filenames, markers, clean_up_sys_path, match=None, module_unload=False):
     if not filenames:
         print('No module to test found.')
         print('''You might need to add `modules` and `source_location` item under [hammett] in setup.cfg  like:
@@ -472,6 +489,8 @@ source_location=.
     from os.path import split, sep
 
     session_request = Request(scope='session', parent=None)
+
+    from hammett.impl import should_stop
 
     for test_filename in sorted(filenames):
         dirname, filename = split(test_filename)
@@ -493,6 +512,7 @@ source_location=.
 
         # We do this here because if all test results are up to date, we want to avoid loading slow plugins!
         if not plugins_loaded:
+            from hammett.impl import load_plugins
             load_plugins()
             plugins_loaded = True
 
