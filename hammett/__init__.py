@@ -168,6 +168,11 @@ class Config:
     def getvalue(self, _):
         return None
 
+    def getini(self, name):
+        return None
+
+    # For xdist emulation add workerinput which is a dict that contains a key "workerid"
+
 
 class Request:
     current_fixture_setup = None
