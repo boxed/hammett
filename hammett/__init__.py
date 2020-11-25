@@ -500,7 +500,6 @@ source_location=.
     for test_filename in sorted(filenames):
         dirname, filename = split(test_filename)
 
-        import importlib.util
         if dirname.startswith(f'.{os.sep}'):
             dirname = dirname[2:]
 
@@ -521,68 +520,7 @@ source_location=.
             load_plugins()
             plugins_loaded = True
 
-        spec = importlib.util.spec_from_file_location(module_name, test_filename)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        try:
-            spec.loader.exec_module(module)
-        except Exception:
-            print(f'Failed to load module {module_name}:')
-            import traceback
-            print(traceback.format_exc())
-            g.results['abort'] += 1
-            break
-
-        module_request = Request(scope='module', parent=session_request)
-
-        module_markers = getattr(module, 'pytestmark', [])
-        if not isinstance(module_markers, list):
-            module_markers = [module_markers]
-
-        from hammett.impl import execute_test_function, execute_test_class
-        from unittest import TestCase
-        for name, f in list(module.__dict__.items()):
-            if g.results['abort']:
-                break
-
-            if match is not None:
-                if match not in name:
-                    continue
-
-            for m in module_markers:
-                f = m(f)
-
-            is_test_function = name.startswith('test_') and callable(f)
-            is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
-
-            if not is_test_function and not is_test_class:
-                continue
-
-            if markers is not None:
-                keep = False
-                for f_marker in getattr(f, 'hammett_markers', []):
-                    if f_marker.name in markers:
-                        arg = markers[f_marker.name]
-                        if arg is not None:
-                            assert len(f_marker.args) == 1, 'hammett only supports filtering on single arguments to markers right now'
-                            if str(f_marker.args[0]) == arg:
-                                keep = True
-                                break
-                        else:
-                            keep = True
-                            break
-                if not keep:
-                    continue
-
-            if is_test_function:
-                execute_test_function(f'{module_name}.{name}', f, module_request)
-            elif is_test_class:
-                execute_test_class(f'{module_name}.{name}', f, module_request)
-
-            if should_stop():
-                break
-
-        module_request.teardown()
+        run_tests_for_filename(test_filename, session_request, markers, match, module_name)
 
         if module_unload:
             del sys.modules[module_name]
@@ -634,9 +572,136 @@ source_location=.
     return 1 if g.results['failed'] else 0
 
 
+def load_module(module_name, test_filename):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(module_name, test_filename)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        print(f'Failed to load module {module_name}:')
+        import traceback
+        print(traceback.format_exc())
+        g.results['abort'] += 1
+    return module
+
+
+def run_tests_for_filename(test_filename, session_request, markers, match, module_name):
+    module = load_module(module_name, test_filename)
+
+    if g.results['abort']:
+        return
+
+    module_request = Request(scope='module', parent=session_request)
+
+    module_markers = getattr(module, 'pytestmark', [])
+    if not isinstance(module_markers, list):
+        module_markers = [module_markers]
+
+    from hammett.impl import execute_test_function, execute_test_class
+    from unittest import TestCase
+    from hammett.impl import should_stop
+
+    for name, f in list(module.__dict__.items()):
+        if g.results['abort']:
+            break
+
+        if match is not None:
+            if match not in name:
+                continue
+
+        for m in module_markers:
+            f = m(f)
+
+        is_test_function = name.startswith('test_') and callable(f)
+        is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
+
+        if not is_test_function and not is_test_class:
+            continue
+
+        if markers is not None:
+            keep = False
+            for f_marker in getattr(f, 'hammett_markers', []):
+                if f_marker.name in markers:
+                    arg = markers[f_marker.name]
+                    if arg is not None:
+                        assert len(f_marker.args) == 1, 'hammett only supports filtering on single arguments to markers right now'
+                        if str(f_marker.args[0]) == arg:
+                            keep = True
+                            break
+                    else:
+                        keep = True
+                        break
+            if not keep:
+                continue
+
+        if is_test_function:
+            execute_test_function(f'{module_name}.{name}', f, module_request)
+        elif is_test_class:
+            execute_test_class(f'{module_name}.{name}', f, module_request)
+
+        if should_stop():
+            break
+
+    module_request.teardown()
+
+
 def hookimpl(*_, **__):
     print("WARNING: hookimpl is not implemented in hammett")
     return lambda f: f
+
+
+def multi_process_main(*, match, module_unload=False, **kwargs):
+    import os
+
+    # key == filename
+
+    # manual fork
+    result_by_key = {}
+
+    def read_one_child_exit_status():
+        pid, status = os.wait()
+        result_by_key[key_from_pid[pid]] = (0xFF00 & status) >> 8  # The high byte contains the exit code
+
+    hammett_kwargs = main_setup(**kwargs)
+
+    key_from_pid = {}
+    running_children = 0
+    max_children = 160
+
+    for key in hammett_kwargs['filenames']:
+        pid = os.fork()
+        if not pid:
+            # In the child
+
+            # this is needed for non-memory DBs
+            Config.workerinput = dict(workerinput=f'_{key}')
+
+            hammett_kwargs['filenames'] = [key]
+
+            _orig_print('start:', key)
+
+            result = main_run_tests(**hammett_kwargs, match=match, module_unload=module_unload)
+            _orig_print('end:', key)
+            if result != 0:
+                # TODO: write failure information to stdout?
+                pass
+            os._exit(result)
+        else:
+            key_from_pid[pid] = key
+            running_children += 1
+
+        if running_children >= max_children:
+            read_one_child_exit_status()
+            running_children -= 1
+
+    try:
+        while True:
+            read_one_child_exit_status()
+    except ChildProcessError:
+        pass
+    return 0
 
 
 def main_cli(args=None):
@@ -647,6 +712,7 @@ def main_cli(args=None):
     parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', default=False)
     parser.add_argument('-x', dest='fail_fast', action='store_true', default=False)
     parser.add_argument('-q', dest='quiet', action='store_true', default=False)
+    parser.add_argument('--multi-experimental', dest='multi_process', action='store_true', default=False)
     parser.add_argument('-k', dest='match', default=None)
     parser.add_argument('-m', dest='markers', default=None)
     parser.add_argument('--use-cache', dest='use_cache', default=False, help='The cache is an experimental feature to run only relevant changes based on looking at what files have been changed.')
@@ -656,7 +722,11 @@ def main_cli(args=None):
     parser.add_argument(dest='filenames', nargs='*')
     args = parser.parse_args(args)
 
-    return main(
+    m = main
+    if args.multi_process:
+        m = multi_process_main
+
+    return m(
         verbose=args.verbose,
         fail_fast=args.fail_fast,
         quiet=args.quiet,
