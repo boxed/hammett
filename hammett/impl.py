@@ -714,6 +714,7 @@ def read_settings():
     config_parser.read('setup.cfg')
     try:
         hammett.g.settings.update(dict(config_parser.items('hammett')))
+        hammett.g.settings['config'] = dict([x.split('=', 1) for x in hammett.g.settings.get('config', '').strip().split('\n')])
     except NoSectionError:
         return
 

@@ -165,8 +165,8 @@ class Config:
     def __init__(self):
         self.option = Option()
 
-    def getvalue(self, _):
-        return None
+    def getvalue(self, key):
+        return g.settings['config'].get(key)
 
     def getini(self, name):
         return None
