@@ -648,7 +648,6 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
 
 
 def hookimpl(*_, **__):
-    print("WARNING: hookimpl is not implemented in hammett")
     return lambda f: f
 
 

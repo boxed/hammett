@@ -714,7 +714,12 @@ def read_settings():
     config_parser.read('setup.cfg')
     try:
         hammett.g.settings.update(dict(config_parser.items('hammett')))
-        hammett.g.settings['config'] = dict([x.split('=', 1) for x in hammett.g.settings.get('config', '').strip().split('\n')])
+        options = [x.partition('=') for x in hammett.g.settings.get('config', '').strip().split('\n')]
+        options = [
+            (x[0], x[2])
+            for x in options
+        ]
+        hammett.g.settings['config'] = dict(options)
     except NoSectionError:
         return
 
@@ -740,3 +745,7 @@ def load_plugins():
             load_plugin(plugin)
             if should_stop():
                 return
+
+        session_start = getattr(conftest, 'pytest_sessionstart', None)
+        if session_start:
+            session_start(None)

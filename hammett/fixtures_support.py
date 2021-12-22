@@ -26,6 +26,13 @@ from io import StringIO
 from typing import List
 import logging
 from contextlib import contextmanager
+import re
+
+_ANSI_ESCAPE_SEQ = re.compile(r"\x1b\[[\d;]+m")
+
+
+def _remove_ansi_escape_sequences(text):
+    return _ANSI_ESCAPE_SEQ.sub("", text)
 
 
 @contextmanager
