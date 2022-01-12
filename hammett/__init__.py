@@ -1,14 +1,16 @@
-import sys
 import os
+import sys
 from collections import defaultdict
 from os import listdir
 from os.path import (
     abspath,
+    dirname,
     isdir,
     join,
+    sep,
     split,
+    basename,
 )
-
 
 __version__ = '0.9.2'
 
@@ -157,8 +159,11 @@ def fail(message):
 
 
 class Option:
-    def __init__(self):
-        self.verbose = g.verbose
+    def __getattr__(self, name):
+        if hasattr(g, name):
+            return getattr(g, name)
+        return False
+
 
 
 class Config:
@@ -172,6 +177,21 @@ class Config:
         return None
 
     # For xdist emulation add workerinput which is a dict that contains a key "workerid"
+
+
+class PytestDirShim:
+    def __init__(self, dir):
+        self.dir = dir
+
+    def dirpath(self):
+        return self
+
+    @property
+    def purebasename(self):
+        return basename(self.dir).rpartition('.')[0]
+
+    def join(self, *args):
+        return join(*([dirname(self.dir)] + [str(x) for x in args]))
 
 
 class Request:
@@ -188,6 +208,9 @@ class Request:
         self.fixture_results = {}
         self.funcargnames = []
         self.catch_log_handler = None
+        if function:
+            self.fspath = PytestDirShim(function.__code__.co_filename)
+            self.name = function.__name__
 
         self.config = Config()
 

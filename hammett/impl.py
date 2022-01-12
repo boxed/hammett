@@ -673,6 +673,22 @@ class EarlyConfig:
 early_config = EarlyConfig()
 
 
+class OptionParserGroup:
+    def addoption(self, *optnames, **attrs):
+        pass
+
+    def _addoption(self, *optnames, **attrs):
+        pass
+
+
+class OptionParser:
+    def getgroup(self, name):
+        return OptionParserGroup()
+
+    def addini(self, *_, **__):
+        pass
+
+
 def load_plugin(module_name):
     import importlib
     try:
@@ -691,6 +707,10 @@ def load_plugin(module_name):
                 plugin_module.pytest_configure(early_config)
             else:
                 plugin_module.pytest_configure()
+
+        if hasattr(plugin_module, 'pytest_addoption'):
+            # This is just a stup for now
+            plugin_module.pytest_addoption(OptionParser())
     except Exception:
         hammett.print(f'Loading plugin {module_name} failed: ')
         import traceback
