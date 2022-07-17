@@ -43,6 +43,10 @@ def parametrize(argnames, argvalues, indirect=False, ids=None, scope=None):
     return parametrize_wrapper
 
 
+class Item:
+    pass
+
+
 class _Mark:
     def __getattr__(self, name: str):
         if name == parametrize.__name__:
@@ -163,7 +167,6 @@ class Option:
         if hasattr(g, name):
             return getattr(g, name)
         return False
-
 
 
 class Config:

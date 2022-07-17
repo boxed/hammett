@@ -110,7 +110,7 @@ def fixture_function_name(f):
 
 
 # TODO: store args
-def register_fixture(fixture, *args, autouse=False, scope='function'):
+def register_fixture(fixture, *args, autouse=False, scope='function', name=None):
     if scope == 'class':
         # hammett does not support class based tests
         return
@@ -584,7 +584,7 @@ def run_test(_name, _f, _module_request, **kwargs):
 
 def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
     if not _stack:
-        param_names = [f'{k}={v}' for k, v in kwargs.items()]
+        param_names = [f'{k}={v!r}' for k, v in kwargs.items()]
         _name = f'{_name}[{", ".join(param_names)}]'
         return run_test(_name, _f, _module_request=_module_request, **kwargs)
 
