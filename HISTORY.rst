@@ -1,6 +1,24 @@
 Changelog
 ---------
 
+0.9.3 (2022-07-17)
+~~~~~~~~~~~~~~~~~~
+
+* Some fixes for pytest compatibility
+
+* The bare minimum to work with pytest-snapshot (but not be able to collect snapshots)
+
+* Random fixes. Super basic support for pytest_sessionstart
+
+* Support for specifying config in setup.cfg file. This is useful for e.g django: config=nomigrations
+
+* Experimental multiprocessing tests
+
+* A little fix for not breaking when test plugins think we have xdist
+
+* Fixes for running in no-cache mode, and some improvements for making mutation testing faster down the line
+
+
 0.9.2 (2020-10-19
 ~~~~~~~~~~~~~~~~~~
 
