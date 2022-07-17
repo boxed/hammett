@@ -61,3 +61,6 @@ venv:
 run-examples: venv
 	python examples/manage.py migrate
 	python examples/manage.py runserver
+
+release:
+	rm -rf dist/ && python setup.py sdist && twine upload dist/*
