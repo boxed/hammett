@@ -628,10 +628,15 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
     from hammett.impl import execute_test_function, execute_test_class
     from unittest import TestCase
     from hammett.impl import should_stop
-
     for name, f in list(module.__dict__.items()):
         if g.results['abort']:
             break
+
+        is_test_function = name.startswith('test_') and callable(f)
+        is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
+
+        if not is_test_function and not is_test_class:
+            continue
 
         if match is not None:
             if match not in name:
@@ -639,12 +644,6 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
 
         for m in module_markers:
             f = m(f)
-
-        is_test_function = name.startswith('test_') and callable(f)
-        is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
-
-        if not is_test_function and not is_test_class:
-            continue
 
         if markers is not None:
             keep = False
