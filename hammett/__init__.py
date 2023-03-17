@@ -108,6 +108,8 @@ class Globals:
         self.hijacked_stdout = None
         self.hijacked_stderr = None
         self.use_cache = None
+        self.pre_test_callback = None
+        self.post_test_callback = None
 
     def reset(self):
         self.__init__()
@@ -442,12 +444,12 @@ def finish():
             g.results[y.status] += 1
 
 
-def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=False):
-    params = main_setup(verbose=verbose, fail_fast=fail_fast, quiet=quiet, filenames=filenames, drop_into_debugger=drop_into_debugger, durations=durations, markers=markers, disable_assert_analyze=disable_assert_analyze, cwd=cwd, use_cache=use_cache)
+def main(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, match=None, durations=False, markers=None, disable_assert_analyze=False, module_unload=False, cwd=None, use_cache=False, pre_test_callback=None, post_test_callback=None):
+    params = main_setup(verbose=verbose, fail_fast=fail_fast, quiet=quiet, filenames=filenames, drop_into_debugger=drop_into_debugger, durations=durations, markers=markers, disable_assert_analyze=disable_assert_analyze, cwd=cwd, use_cache=use_cache, pre_test_callback=pre_test_callback, post_test_callback=post_test_callback)
     return main_run_tests(match=match, module_unload=module_unload, **params)
 
 
-def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, durations=False, markers=None, disable_assert_analyze=False, cwd=None, use_cache=False):
+def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop_into_debugger=False, durations=False, markers=None, disable_assert_analyze=False, cwd=None, use_cache=False, pre_test_callback=None, post_test_callback=None):
     import sys
     if sys.version_info[:2] < (3, 6):
         print('hammett requires python 3.6 or later')
@@ -479,6 +481,8 @@ def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop
     g.durations = durations
     g.disable_assert_analyze = disable_assert_analyze
     g.use_cache = use_cache
+    g.pre_test_callback = pre_test_callback
+    g.post_test_callback = post_test_callback
 
     from hammett.impl import read_settings
     read_settings()
@@ -503,7 +507,7 @@ def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop
     )
 
 
-def main_run_tests(filenames, markers, clean_up_sys_path, match=None, module_unload=False):
+def main_run_tests(filenames, markers, clean_up_sys_path, match=None, module_unload=False, tests=None):
     if not filenames:
         print('No module to test found.')
         print('''You might need to add `modules` and `source_location` item under [hammett] in setup.cfg  like:
@@ -515,6 +519,8 @@ modules=
 source_location=.
 ''')
         return 3
+
+    g.results.update(dict(success=0, failed=0, skipped=0, abort=0))
 
     plugins_loaded = False
     from os.path import split, sep
@@ -546,7 +552,7 @@ source_location=.
             load_plugins()
             plugins_loaded = True
 
-        run_tests_for_filename(test_filename, session_request, markers, match, module_name)
+        run_tests_for_filename(test_filename, session_request, markers, match, module_name, tests)
 
         if module_unload:
             del sys.modules[module_name]
@@ -613,7 +619,7 @@ def load_module(module_name, test_filename):
     return module
 
 
-def run_tests_for_filename(test_filename, session_request, markers, match, module_name):
+def run_tests_for_filename(test_filename, session_request, markers, match, module_name, tests):
     module = load_module(module_name, test_filename)
 
     if g.results['abort']:
@@ -632,6 +638,8 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
         if g.results['abort']:
             break
 
+        full_name = f'{module_name}.{name}'
+
         is_test_function = name.startswith('test_') and callable(f)
         is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
 
@@ -640,6 +648,10 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
 
         if match is not None:
             if match not in name:
+                continue
+
+        if tests is not None:
+            if full_name not in tests:
                 continue
 
         for m in module_markers:
@@ -662,9 +674,9 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
                 continue
 
         if is_test_function:
-            execute_test_function(f'{module_name}.{name}', f, module_request)
+            execute_test_function(full_name, f, module_request)
         elif is_test_class:
-            execute_test_class(f'{module_name}.{name}', f, module_request)
+            execute_test_class(full_name, f, module_request)
 
         if should_stop():
             break

@@ -486,6 +486,9 @@ def run_test(_name, _f, _module_request, **kwargs):
         inc_test_result(_name, _f, Result(status=SKIPPED))
         return
 
+    if hammett.g.pre_test_callback is not None:
+        hammett.g.pre_test_callback(name=_name, f=_f, module_request=_module_request, **kwargs)
+
     from io import StringIO
 
     req = hammett.Request(scope='function', parent=_module_request, function=_f)
@@ -580,6 +583,10 @@ def run_test(_name, _f, _module_request, **kwargs):
     # Tests can change this which breaks everything. Reset!
     os.chdir(hammett.g.orig_cwd)
     req.teardown()
+
+    if hammett.g.post_test_callback is not None:
+        hammett.g.post_test_callback(name=_name, f=_f, module_request=_module_request, **kwargs)
+
 
 
 def execute_parametrize(_name, _f, _stack, _module_request, **kwargs):
