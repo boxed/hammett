@@ -585,7 +585,7 @@ def run_test(_name, _f, _module_request, **kwargs):
     req.teardown()
 
     if hammett.g.post_test_callback is not None:
-        hammett.g.post_test_callback(name=_name, f=_f, module_request=_module_request, **kwargs)
+        hammett.g.post_test_callback(_name=_name, _f=_f, _module_request=_module_request, **kwargs)
 
 
 
