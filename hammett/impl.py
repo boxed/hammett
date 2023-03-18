@@ -255,6 +255,8 @@ def should_skip(_f):
         for marker in _f.hammett_markers:
             if marker.name == 'skip':
                 return True
+            if marker.name == 'skipif' and marker.args[0]:
+                return True
     except AttributeError:
         pass
 
