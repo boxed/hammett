@@ -116,7 +116,8 @@ def register_fixture(fixture, *args, autouse=False, scope='function', name=None)
         return
     assert scope != 'package', 'Package scope is not supported at this time'
 
-    name = fixture_function_name(fixture)
+    if name is None:
+        name = fixture_function_name(fixture)
     # pytest uses shadowing.. I don't like it but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
     if hammett.g.verbose and name in fixtures and name != 'request':
