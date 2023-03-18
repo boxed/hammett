@@ -155,7 +155,7 @@ def raises(expected_exception, match=None):
     return RaisesContext(expected_exception, match=match)
 
 
-def warns(expected_warning, match=None):
+def warns(expected_warning=None, match=None):
     from hammett.impl import WarnsContext
     return WarnsContext(expected_warning, match=match)
 
