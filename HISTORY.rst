@@ -1,6 +1,21 @@
 Changelog
 ---------
 
+0.9.4 (2023-03-19)
+~~~~~~~~~~~~~~~~~~
+
+* Python 3.11 compatibility
+
+* Hooks for using Hammett as an API (for mutmut3)
+
+* Explicit fixture names didn't work
+
+* Support `skipif`
+
+* `warns()` without arguments fixed
+
+* `conftest.py` handling massively improved
+
 0.9.3 (2022-07-17)
 ~~~~~~~~~~~~~~~~~~
 

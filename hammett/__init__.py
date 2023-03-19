@@ -4,15 +4,14 @@ from collections import defaultdict
 from os import listdir
 from os.path import (
     abspath,
+    basename,
     dirname,
     isdir,
     join,
-    sep,
     split,
-    basename,
 )
 
-__version__ = '0.9.3'
+__version__ = '0.9.4'
 
 from hammett.colors import (
     YELLOW,
