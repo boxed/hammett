@@ -1,9 +1,20 @@
 <component name="ProjectDictionaryState">
   <dictionary name="boxed">
     <words>
+      <w>addini</w>
+      <w>addinivalue</w>
+      <w>addoption</w>
+      <w>autoclear</w>
       <w>conftest</w>
+      <w>conftests</w>
+      <w>excinfo</w>
+      <w>getini</w>
+      <w>inicfg</w>
+      <w>optnames</w>
       <w>pytest</w>
       <w>pytestmark</w>
+      <w>sessionstart</w>
+      <w>skipif</w>
     </words>
   </dictionary>
 </component>
