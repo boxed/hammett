@@ -1,3 +1,4 @@
+import importlib
 import os
 import sys
 from collections.abc import Iterable
@@ -20,6 +21,9 @@ from hammett.colors import (
     MAGENTA,
     RESET_COLOR,
 )
+
+_loading_plugins = False
+_loading_conftest = False
 
 
 class RaisesContext(object):
@@ -110,7 +114,7 @@ def fixture_function_name(f):
 
 
 # TODO: store args
-def register_fixture(fixture, *args, autouse=False, scope='function', name=None):
+def register_fixture(fixture, *args, autouse=False, scope='function', name=None, module_name=None):
     if scope == 'class':
         # hammett does not support class based tests
         return
@@ -118,12 +122,18 @@ def register_fixture(fixture, *args, autouse=False, scope='function', name=None)
 
     if name is None:
         name = fixture_function_name(fixture)
-    # pytest uses shadowing.. I don't like it but I guess we have to follow that?
+    # pytest uses shadowing... I don't like it, but I guess we have to follow that?
     # assert name not in fixtures, 'A fixture with this name is already registered'
     if hammett.g.verbose and name in fixtures and name != 'request':
         hammett.print(f'{fixture} shadows {fixtures[name]}')
     if autouse:
-        auto_use_fixtures.add(name)
+        if _loading_plugins:
+            module_name = ''
+        else:
+            module_name = module_name or fixture.__module__
+        if _loading_conftest:
+            module_name = module_name.replace('.conftest', '.')
+        auto_use_fixtures.add((module_name, name))
     assert scope in ('function', 'class', 'module', 'package', 'session')
     fixture_scope[name] = scope
     fixtures[name] = fixture
@@ -184,14 +194,14 @@ def call_fixture_func(fixturefunc, request, kwargs):
 
     res = fixturefunc(**kwargs)
 
-    request.hammett_add_fixture_result(res)
-
     yieldctx = inspect.isgenerator(res)
     if yieldctx:
         it = fixturefunc(**kwargs)
         res = next(it)
         finalizer = functools.partial(_teardown_yield_fixture, fixturefunc, it)
         request.addfinalizer(finalizer)
+
+    request.hammett_add_fixture_result(res)
 
     Request.current_fixture_setup = None
 
@@ -201,7 +211,13 @@ def call_fixture_func(fixturefunc, request, kwargs):
 def dependency_injection(f, fixtures, request):
     fixtures = fixtures.copy()
 
-    requested = params_of(f) | (request.additional_fixtures_wanted if request is not None else set()) | auto_use_fixtures
+    relevant_auto_use_fixtures = {
+        name
+        for module_name, name in auto_use_fixtures
+        if not module_name or f.__module__.startswith(module_name)
+    }
+
+    requested = params_of(f) | (request.additional_fixtures_wanted if request is not None else set()) | relevant_auto_use_fixtures
 
     request.additional_fixtures_wanted.clear()
 
@@ -360,7 +376,7 @@ def analyze_assert(tb):
         assert_statement = ast.parse(relevant_source.strip()).body[0]
     except SyntaxError:
         try:
-            # grab one more line after the the one where we got an exception, and try again
+            # grab one more line after the one where we got an exception, and try again
             relevant_source += '\n' + source[tb.tb_frame.f_lineno]
             assert_statement = ast.parse(relevant_source.strip()).body[0]
         except SyntaxError:
@@ -499,7 +515,7 @@ def run_test(_name, _f, _module_request, **kwargs):
     def request():
         return req
 
-    register_fixture(request, autouse=True)
+    register_fixture(request, module_name='', autouse=True)
     del request
 
     hammett.g.hijacked_stdout = StringIO()
@@ -547,6 +563,7 @@ def run_test(_name, _f, _module_request, **kwargs):
         hammett.print('ABORTED')
         hammett.g.results['abort'] += 1
         hammett.g.should_stop = True
+        return
     except SkipTest:
         sys.stdout = prev_stdout
         sys.stderr = prev_stderr
@@ -567,7 +584,8 @@ def run_test(_name, _f, _module_request, **kwargs):
     assert status is not None
 
     result = Result(
-        status=status, duration=duration,
+        status=status,
+        duration=duration,
         stdout=hammett.g.hijacked_stdout.getvalue(),
         stderr=hammett.g.hijacked_stderr.getvalue(),
         stack_trace=stack_trace,
@@ -651,8 +669,6 @@ def execute_test_class(_name, _c, module_request):
     except AttributeError:
         pass
 
-    # return run_test(_name, _f, module_request)
-
 
 class FakePytestParser:
     def parse_known_args(self, *args):
@@ -707,6 +723,7 @@ def load_plugin(module_name):
         plugin_module = importlib.import_module(module_name)
 
     parser = FakePytestParser()
+    # noinspection PyBroadException
     try:
         if hasattr(plugin_module, 'pytest_load_initial_conftests'):
             plugin_module.pytest_load_initial_conftests(early_config=early_config, parser=parser, args=[])
@@ -758,24 +775,40 @@ def load_plugins():
     if 'plugins' not in hammett.g.settings:
         return
 
-    import importlib
+    global _loading_plugins
+    _loading_plugins = True
+
     for plugin in hammett.g.settings['plugins'].strip().split('\n'):
         load_plugin(plugin)
         if should_stop():
             return
 
+    _loading_plugins = False
+
+
+def load_conftests(filenames):
+    global _loading_conftest
+    _loading_conftest = True
+
+    load_conftest('conftest.py')
+    for f in filenames:
+        load_conftest(f)
+
+    _loading_conftest = False
+
+
+def load_conftest(filename):
     try:
-        conftest = importlib.import_module('conftest')
+        conftest = importlib.import_module(filename.replace('.py', '').replace(os.sep, '.'))
     except ImportError:
-        conftest = None
+        return
 
-    if conftest is not None:
-        plugins = getattr(conftest, 'pytest_plugins', [])
-        for plugin in plugins:
-            load_plugin(plugin)
-            if should_stop():
-                return
+    plugins = getattr(conftest, 'pytest_plugins', [])
+    for plugin in plugins:
+        load_plugin(plugin)
+        if should_stop():
+            return
 
-        session_start = getattr(conftest, 'pytest_sessionstart', None)
-        if session_start:
-            session_start(None)
+    session_start = getattr(conftest, 'pytest_sessionstart', None)
+    if session_start:
+        session_start(None)

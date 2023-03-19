@@ -308,27 +308,33 @@ def guess_modules_and_source_path():
     return [], '.'
 
 
-def handle_dir(result, d):
+def is_test_file(f):
+    return not f.startswith('.') and f.endswith('.py') and (f.endswith('__tests.py') or f.startswith('test_') or f.endswith('_test.py'))
+
+
+def handle_dir(result, conftest_files, d):
     for root, dirs, files in os.walk(d):
-        files = [
-            f for f in files
-            if not f.startswith('.') and f.endswith('__tests.py') or (f.startswith('test_') and f.endswith('.py')) or f.endswith('_test.py')
-        ]
-        result.extend(join(root, x) for x in files)
+        for f in files:
+            if is_test_file(f):
+                result.append(join(root, f) )
+            if f == 'conftest.py':
+                conftest_files.append(join(root, f))
 
 
 def collect_files(filenames):
     result = []
+    conftest_files = []
     if filenames is None:
-        handle_dir(result, f'tests{os.sep}')
-        handle_dir(result, f'test{os.sep}')
+        handle_dir(result, conftest_files, f'tests{os.sep}')
+        handle_dir(result, conftest_files, f'test{os.sep}')
+        handle_dir(result, conftest_files, f'docs{os.sep}')
         for module_name in g.modules:
-            handle_dir(result, join(g.source_location, module_name))
+            handle_dir(result, conftest_files, join(g.source_location, module_name))
     else:
         for filename in filenames:
             if os.path.exists(filename):
                 if os.path.isdir(filename):
-                    handle_dir(result, filename)
+                    handle_dir(result, conftest_files, filename)
                 else:
                     result.append(filename)
             else:
@@ -337,7 +343,7 @@ def collect_files(filenames):
                 if os.path.exists(symbol_path + '.py'):
                     result.append(symbol_path + '__tests.py')
 
-    return result
+    return result, conftest_files
 
 
 def collect_file_data(path):
@@ -362,7 +368,7 @@ def write_result_db(results):
     """
     The results database is a simple pickled dict with some keys:
 
-    db_version: the version so we can change the format and throw away an old db if needed
+    db_version: the version. So we can change the format and throw away an old db if needed
     test_results: dict from filename -> (dict from test_name -> dict(stdout=str, stderr=str, status=str))
     file_data: dict filename -> nanosecond modification date
     """
@@ -500,14 +506,17 @@ def main_setup(verbose=False, fail_fast=False, quiet=False, filenames=None, drop
     update_result_db(g.result_db, collect_file_data(g.source_location))
     write_result_db(g.result_db)
 
+    filenames, conftest_files = collect_files(filenames)
+
     return dict(
-        filenames=collect_files(filenames),
+        filenames=filenames,
+        conftest_files=conftest_files,
         markers=markers,
         clean_up_sys_path=clean_up_sys_path,
     )
 
 
-def main_run_tests(filenames, markers, clean_up_sys_path, match=None, module_unload=False, tests=None):
+def main_run_tests(filenames, conftest_files, markers, clean_up_sys_path, match=None, module_unload=False, tests=None):
     if not filenames:
         print('No module to test found.')
         print('''You might need to add `modules` and `source_location` item under [hammett] in setup.cfg  like:
@@ -523,6 +532,7 @@ source_location=.
     g.results.update(dict(success=0, failed=0, skipped=0, abort=0))
 
     plugins_loaded = False
+    conftests_loaded = False
     from os.path import split, sep
 
     session_request = Request(scope='session', parent=None)
@@ -536,8 +546,8 @@ source_location=.
             dirname = dirname[2:]
 
         module_name = f'{dirname.replace(sep, ".")}.{filename.replace(".py", "")}'
-        if module_name in sys.modules:
-            del sys.modules[module_name]
+        # if module_name in sys.modules:
+        #     del sys.modules[module_name]
 
         cache_filename = join(dirname, filename)
         if cache_filename in g.result_db['test_results']:
@@ -552,10 +562,15 @@ source_location=.
             load_plugins()
             plugins_loaded = True
 
+        if not conftests_loaded:
+            from hammett.impl import load_conftests
+            load_conftests(conftest_files)
+            conftests_loaded = True
+
         run_tests_for_filename(test_filename, session_request, markers, match, module_name, tests)
 
-        if module_unload:
-            del sys.modules[module_name]
+        # if module_unload:
+        #     del sys.modules[module_name]
 
         if should_stop():
             break
