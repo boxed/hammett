@@ -561,6 +561,9 @@ source_location=.
             load_plugins()
             plugins_loaded = True
 
+        if should_stop():
+            break
+
         if not conftests_loaded:
             from hammett.impl import load_conftests
             load_conftests(conftest_files)
