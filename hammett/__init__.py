@@ -655,7 +655,7 @@ def run_tests_for_filename(test_filename, session_request, markers, match, modul
         if g.results['abort']:
             break
 
-        full_name = f'{module_name}.{name}'
+        full_name = f'{test_filename}::{name}'.replace('./', '')
 
         is_test_function = name.startswith('test_') and callable(f)
         is_test_class = isinstance(f, type) and issubclass(f, TestCase) or name.startswith('Test')
